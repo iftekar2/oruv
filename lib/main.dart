@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-//import 'package:oruv/components/homeScreen.dart';
-import 'package:oruv/components/welcomePages/screenOne.dart';
+import 'package:oruv/components/welcomePages/welcomePage.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,7 +15,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
 
       //theme: ThemeData(scaffoldBackgroundColor: Colors.white),
-      home: ScreenOne(),
+      home: WelcomePage(),
     );
   }
 }
