@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oruv/components/welcomePages/screenFour.dart';
 import 'package:oruv/components/welcomePages/screenOne.dart';
 import 'package:oruv/components/welcomePages/screenThree.dart';
 import 'package:oruv/components/welcomePages/screenTwo.dart';
@@ -13,7 +14,7 @@ class WelcomePage extends StatefulWidget {
 class _WelcomePageState extends State<WelcomePage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  int _totalTabs = 3;
+  int _totalTabs = 4;
 
   @override
   void dispose() {
@@ -33,7 +34,7 @@ class _WelcomePageState extends State<WelcomePage> {
           });
         },
 
-        children: [ScreenOne(), ScreenTwo(), ScreenThree()],
+        children: [ScreenOne(), ScreenTwo(), ScreenThree(), ScreenFour()],
       ),
 
       bottomNavigationBar: SafeArea(
