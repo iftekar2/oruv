@@ -60,6 +60,13 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - lib/components/images/logo.png
+
+    - lib/icons/instagram.png
+    - lib/icons/reddit.png
+    - lib/icons/snapchat.png
+    - lib/icons/tik-tok.png
+    - lib/icons/twitter.png
+    - lib/icons/youtube.png
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
