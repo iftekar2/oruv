@@ -10,6 +10,6 @@ class ScreenFour extends StatefulWidget {
 class _ScreenFourState extends State<ScreenFour> {
   @override
   Widget build(BuildContext context) {
-    return const Placeholder();
+    return Scaffold(body: Center(child: Column()));
   }
 }

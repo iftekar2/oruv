@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   google_fonts: ^6.3.2
   flutter_svg: ^2.2.3
+  full_svg_flutter: ^1.2.0
 
 dev_dependencies:
   flutter_test:
@@ -69,8 +70,7 @@ flutter:
     - lib/icons/tik-tok.png
     - lib/icons/twitter.png
     - lib/icons/youtube.png
-    - lib/icons/moon.png
-    - lib/icons/sun.png
+    
  
 
   # An image asset can refer to one or more resolution-specific "variants", see
