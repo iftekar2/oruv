@@ -37,8 +37,10 @@ class _WelcomePageState extends State<WelcomePage> {
         children: [ScreenOne(), ScreenTwo(), ScreenThree(), ScreenFour()],
       ),
 
-      bottomNavigationBar: SafeArea(
-        child: Padding(
+      bottomNavigationBar: _currentPage == _totalTabs - 1
+          ? null
+          : SafeArea(
+              child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
 
           child: Row(
@@ -102,7 +104,7 @@ class _WelcomePageState extends State<WelcomePage> {
 
                       child: Center(
                         child: Text(
-                          _currentPage == _totalTabs - 1 ? "Finish" : "Next",
+                          "Next",
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 20,

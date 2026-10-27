@@ -70,6 +70,7 @@ flutter:
     - lib/icons/tik-tok.png
     - lib/icons/twitter.png
     - lib/icons/youtube.png
+    - lib/components/images/welcome-image.jpg
     
  
 
