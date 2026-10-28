@@ -6,6 +6,7 @@ import 'package:oruv/components/auth/components/authTextField.dart';
 import 'package:oruv/components/auth/components/googleSignUpButton.dart';
 import 'package:oruv/components/auth/emailSignIn.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EmailSignUp extends StatefulWidget {
   const EmailSignUp({super.key});
@@ -21,6 +22,8 @@ class _EmailSignUpState extends State<EmailSignUp> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
+  bool _isLoading = false;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -28,6 +31,91 @@ class _EmailSignUpState extends State<EmailSignUp> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signUp() async {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill in all fields")),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Passwords do not match")),
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Password must be at least 6 characters long")),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'full_name': name,
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.session != null) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Sign up successful! Please check your email for confirmation."),
+            backgroundColor: Color(0xff4063e4),
+          ),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const EmailSignIn()),
+        );
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Unexpected error: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -106,13 +194,8 @@ class _EmailSignUpState extends State<EmailSignUp> {
 
               AuthButton(
                 text: "Sign Up",
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    (route) => false,
-                  );
-                },
+                isLoading: _isLoading,
+                onPressed: _signUp,
               ),
 
               const SizedBox(height: 30),

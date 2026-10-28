@@ -6,6 +6,7 @@ import 'package:oruv/components/auth/components/authTextField.dart';
 import 'package:oruv/components/auth/components/googleSignInButton.dart';
 import 'package:oruv/components/auth/emailSignUp.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EmailSignIn extends StatefulWidget {
   const EmailSignIn({super.key});
@@ -18,11 +19,66 @@ class _EmailSignInState extends State<EmailSignIn> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
+  bool _isLoading = false;
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signIn() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter both email and password")),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        (route) => false,
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Unexpected error: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -99,13 +155,8 @@ class _EmailSignInState extends State<EmailSignIn> {
 
               AuthButton(
                 text: "Sign In",
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    (route) => false,
-                  );
-                },
+                isLoading: _isLoading,
+                onPressed: _signIn,
               ),
 
               const SizedBox(height: 30),
