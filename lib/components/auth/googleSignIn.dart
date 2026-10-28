@@ -71,11 +71,12 @@ class _GoogleSignInState extends State<GoogleSignIn> {
 
               GoogleSignInButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
+                  Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const HomeScreen(),
                     ),
+                    (route) => false,
                   );
                 },
               ),

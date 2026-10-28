@@ -30,14 +30,7 @@ class _EmailSignInState extends State<EmailSignIn> {
     return Scaffold(
       backgroundColor: Colors.white,
 
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: AppBar(backgroundColor: Colors.white),
 
       body: SafeArea(
         child: SingleChildScrollView(
@@ -107,11 +100,10 @@ class _EmailSignInState extends State<EmailSignIn> {
               AuthButton(
                 text: "Sign In",
                 onPressed: () {
-                  Navigator.pushReplacement(
+                  Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const HomeScreen(),
-                    ),
+                    MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    (route) => false,
                   );
                 },
               ),
@@ -140,11 +132,10 @@ class _EmailSignInState extends State<EmailSignIn> {
 
               GoogleSignInButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
+                  Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const HomeScreen(),
-                    ),
+                    MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    (route) => false,
                   );
                 },
               ),
@@ -153,11 +144,10 @@ class _EmailSignInState extends State<EmailSignIn> {
 
               AppleSignInButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
+                  Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const HomeScreen(),
-                    ),
+                    MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    (route) => false,
                   );
                 },
               ),

@@ -35,14 +35,7 @@ class _EmailSignUpState extends State<EmailSignUp> {
     return Scaffold(
       backgroundColor: Colors.white,
 
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: AppBar(backgroundColor: Colors.white),
 
       body: SafeArea(
         child: SingleChildScrollView(
@@ -114,9 +107,10 @@ class _EmailSignUpState extends State<EmailSignUp> {
               AuthButton(
                 text: "Sign Up",
                 onPressed: () {
-                  Navigator.pushReplacement(
+                  Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    (route) => false,
                   );
                 },
               ),
@@ -145,9 +139,10 @@ class _EmailSignUpState extends State<EmailSignUp> {
 
               GoogleSignUpButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
+                  Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    (route) => false,
                   );
                 },
               ),
@@ -156,9 +151,10 @@ class _EmailSignUpState extends State<EmailSignUp> {
 
               AppleSignUpButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
+                  Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    (route) => false,
                   );
                 },
               ),

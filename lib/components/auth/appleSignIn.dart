@@ -61,11 +61,12 @@ class _AppleSignInState extends State<AppleSignIn> {
 
               AppleSignInButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
+                  Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const HomeScreen(),
                     ),
+                    (route) => false,
                   );
                 },
               ),

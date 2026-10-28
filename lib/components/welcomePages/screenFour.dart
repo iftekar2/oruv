@@ -169,11 +169,12 @@ class _ScreenFourState extends State<ScreenFour> {
                 if (!_isSignUpMode) ...[
                   GoogleSignInButton(
                     onPressed: () {
-                      Navigator.pushReplacement(
+                      Navigator.pushAndRemoveUntil(
                         context,
                         MaterialPageRoute(
                           builder: (context) => const HomeScreen(),
                         ),
+                        (route) => false,
                       );
                     },
                   ),
@@ -182,11 +183,12 @@ class _ScreenFourState extends State<ScreenFour> {
 
                   AppleSignInButton(
                     onPressed: () {
-                      Navigator.pushReplacement(
+                      Navigator.pushAndRemoveUntil(
                         context,
                         MaterialPageRoute(
                           builder: (context) => const HomeScreen(),
                         ),
+                        (route) => false,
                       );
                     },
                   ),
@@ -207,11 +209,12 @@ class _ScreenFourState extends State<ScreenFour> {
                 ] else ...[
                   GoogleSignUpButton(
                     onPressed: () {
-                      Navigator.pushReplacement(
+                      Navigator.pushAndRemoveUntil(
                         context,
                         MaterialPageRoute(
                           builder: (context) => const HomeScreen(),
                         ),
+                        (route) => false,
                       );
                     },
                   ),
@@ -220,11 +223,12 @@ class _ScreenFourState extends State<ScreenFour> {
 
                   AppleSignUpButton(
                     onPressed: () {
-                      Navigator.pushReplacement(
+                      Navigator.pushAndRemoveUntil(
                         context,
                         MaterialPageRoute(
                           builder: (context) => const HomeScreen(),
                         ),
+                        (route) => false,
                       );
                     },
                   ),
