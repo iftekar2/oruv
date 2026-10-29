@@ -26,11 +26,13 @@ class EmailSignUpButton extends StatelessWidget {
           ),
           elevation: 0,
         ),
+
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.email_outlined, color: Colors.white, size: 22),
             const SizedBox(width: 10),
+
             Text(
               text,
               style: TextStyle(

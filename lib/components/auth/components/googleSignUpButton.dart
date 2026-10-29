@@ -5,10 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 class GoogleSignUpButton extends StatelessWidget {
   final VoidCallback? onPressed;
 
-  const GoogleSignUpButton({
-    super.key,
-    this.onPressed,
-  });
+  const GoogleSignUpButton({super.key, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +22,7 @@ class GoogleSignUpButton extends StatelessWidget {
           ),
           elevation: 0,
         ),
+
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -38,6 +36,7 @@ class GoogleSignUpButton extends StatelessWidget {
               height: 22,
               width: 22,
             ),
+
             const SizedBox(width: 12),
             Text(
               "Sign up with Google",

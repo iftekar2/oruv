@@ -41,7 +41,6 @@ class _AuthTextFieldState extends State<AuthTextField> {
         ),
 
         const SizedBox(height: 8),
-
         TextField(
           controller: widget.controller,
           keyboardType: widget.keyboardType,
@@ -52,10 +51,8 @@ class _AuthTextFieldState extends State<AuthTextField> {
               color: Colors.grey.shade400,
               fontFamily: GoogleFonts.sora().fontFamily,
             ),
-            prefixIcon: Icon(
-              widget.prefixIcon,
-              color: const Color(0xff4063e4),
-            ),
+
+            prefixIcon: Icon(widget.prefixIcon, color: const Color(0xff4063e4)),
             suffixIcon: widget.isPassword
                 ? IconButton(
                     icon: Icon(
@@ -75,14 +72,17 @@ class _AuthTextFieldState extends State<AuthTextField> {
               horizontal: 16,
               vertical: 16,
             ),
+
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
+
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
+
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: const BorderSide(

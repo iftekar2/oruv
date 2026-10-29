@@ -4,10 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 class AppleSignUpButton extends StatelessWidget {
   final VoidCallback? onPressed;
 
-  const AppleSignUpButton({
-    super.key,
-    this.onPressed,
-  });
+  const AppleSignUpButton({super.key, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -24,14 +21,12 @@ class AppleSignUpButton extends StatelessWidget {
           ),
           elevation: 0,
         ),
+
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.apple,
-              size: 24,
-              color: Colors.white,
-            ),
+            const Icon(Icons.apple, size: 24, color: Colors.white),
+
             const SizedBox(width: 10),
             Text(
               "Sign up with Apple",
