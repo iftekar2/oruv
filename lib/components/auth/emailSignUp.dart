@@ -39,7 +39,10 @@ class _EmailSignUpState extends State<EmailSignUp> {
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+    if (name.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please fill in all fields")),
       );
@@ -47,15 +50,17 @@ class _EmailSignUpState extends State<EmailSignUp> {
     }
 
     if (password != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Passwords do not match")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Passwords do not match")));
       return;
     }
 
     if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password must be at least 6 characters long")),
+        const SnackBar(
+          content: Text("Password must be at least 6 characters long"),
+        ),
       );
       return;
     }
@@ -68,9 +73,7 @@ class _EmailSignUpState extends State<EmailSignUp> {
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
-        data: {
-          'full_name': name,
-        },
+        data: {'full_name': name},
       );
 
       if (!mounted) return;
@@ -84,10 +87,13 @@ class _EmailSignUpState extends State<EmailSignUp> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Sign up successful! Please check your email for confirmation."),
+            content: Text(
+              "Sign up successful! Please check your email for confirmation.",
+            ),
             backgroundColor: Color(0xff4063e4),
           ),
         );
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const EmailSignIn()),
@@ -96,16 +102,13 @@ class _EmailSignUpState extends State<EmailSignUp> {
     } on AuthException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Unexpected error: $e"),
+          content: Text("An unexpected error occured. Please try again."),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -141,7 +144,6 @@ class _EmailSignUpState extends State<EmailSignUp> {
               ),
 
               const SizedBox(height: 8),
-
               Text(
                 "Sign up to start blocking distractions and reclaim your time.",
                 style: TextStyle(
@@ -152,7 +154,6 @@ class _EmailSignUpState extends State<EmailSignUp> {
               ),
 
               const SizedBox(height: 28),
-
               AuthTextField(
                 label: "Full Name",
                 hintText: "Enter your full name",
@@ -161,7 +162,6 @@ class _EmailSignUpState extends State<EmailSignUp> {
               ),
 
               const SizedBox(height: 18),
-
               AuthTextField(
                 label: "Email Address",
                 hintText: "Enter your email",
@@ -171,7 +171,6 @@ class _EmailSignUpState extends State<EmailSignUp> {
               ),
 
               const SizedBox(height: 18),
-
               AuthTextField(
                 label: "Password",
                 hintText: "Create a password",
@@ -181,7 +180,6 @@ class _EmailSignUpState extends State<EmailSignUp> {
               ),
 
               const SizedBox(height: 18),
-
               AuthTextField(
                 label: "Confirm Password",
                 hintText: "Confirm your password",
@@ -191,7 +189,6 @@ class _EmailSignUpState extends State<EmailSignUp> {
               ),
 
               const SizedBox(height: 24),
-
               AuthButton(
                 text: "Sign Up",
                 isLoading: _isLoading,
@@ -199,7 +196,6 @@ class _EmailSignUpState extends State<EmailSignUp> {
               ),
 
               const SizedBox(height: 30),
-
               Row(
                 children: [
                   Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -219,7 +215,6 @@ class _EmailSignUpState extends State<EmailSignUp> {
               ),
 
               const SizedBox(height: 24),
-
               GoogleSignUpButton(
                 onPressed: () {
                   Navigator.pushAndRemoveUntil(
@@ -231,7 +226,6 @@ class _EmailSignUpState extends State<EmailSignUp> {
               ),
 
               const SizedBox(height: 14),
-
               AppleSignUpButton(
                 onPressed: () {
                   Navigator.pushAndRemoveUntil(
@@ -243,7 +237,6 @@ class _EmailSignUpState extends State<EmailSignUp> {
               ),
 
               const SizedBox(height: 30),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -254,6 +247,7 @@ class _EmailSignUpState extends State<EmailSignUp> {
                       fontFamily: GoogleFonts.sora().fontFamily,
                     ),
                   ),
+
                   GestureDetector(
                     onTap: () {
                       Navigator.pushReplacement(
@@ -263,6 +257,7 @@ class _EmailSignUpState extends State<EmailSignUp> {
                         ),
                       );
                     },
+
                     child: Text(
                       "Sign In",
                       style: TextStyle(

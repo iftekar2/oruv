@@ -59,16 +59,13 @@ class _EmailSignInState extends State<EmailSignIn> {
     } on AuthException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Unexpected error: $e"),
+          content: Text("An unexpected error occurred. Please try again."),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -115,7 +112,6 @@ class _EmailSignInState extends State<EmailSignIn> {
               ),
 
               const SizedBox(height: 32),
-
               AuthTextField(
                 label: "Email Address",
                 hintText: "Enter your email",
@@ -125,7 +121,6 @@ class _EmailSignInState extends State<EmailSignIn> {
               ),
 
               const SizedBox(height: 20),
-
               AuthTextField(
                 label: "Password",
                 hintText: "Enter your password",
@@ -135,7 +130,6 @@ class _EmailSignInState extends State<EmailSignIn> {
               ),
 
               const SizedBox(height: 10),
-
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -152,7 +146,6 @@ class _EmailSignInState extends State<EmailSignIn> {
               ),
 
               const SizedBox(height: 16),
-
               AuthButton(
                 text: "Sign In",
                 isLoading: _isLoading,
@@ -160,7 +153,6 @@ class _EmailSignInState extends State<EmailSignIn> {
               ),
 
               const SizedBox(height: 30),
-
               Row(
                 children: [
                   Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -180,7 +172,6 @@ class _EmailSignInState extends State<EmailSignIn> {
               ),
 
               const SizedBox(height: 24),
-
               GoogleSignInButton(
                 onPressed: () {
                   Navigator.pushAndRemoveUntil(
@@ -192,7 +183,6 @@ class _EmailSignInState extends State<EmailSignIn> {
               ),
 
               const SizedBox(height: 14),
-
               AppleSignInButton(
                 onPressed: () {
                   Navigator.pushAndRemoveUntil(
@@ -204,7 +194,6 @@ class _EmailSignInState extends State<EmailSignIn> {
               ),
 
               const SizedBox(height: 30),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -215,6 +204,7 @@ class _EmailSignInState extends State<EmailSignIn> {
                       fontFamily: GoogleFonts.sora().fontFamily,
                     ),
                   ),
+
                   GestureDetector(
                     onTap: () {
                       Navigator.pushReplacement(
@@ -224,6 +214,7 @@ class _EmailSignInState extends State<EmailSignIn> {
                         ),
                       );
                     },
+
                     child: Text(
                       "Sign Up",
                       style: TextStyle(
