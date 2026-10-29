@@ -46,7 +46,6 @@ class _GoogleSignUpState extends State<GoogleSignUp> {
               ),
 
               const SizedBox(height: 30),
-
               Text(
                 "Sign up with Google",
                 style: TextStyle(
@@ -57,7 +56,6 @@ class _GoogleSignUpState extends State<GoogleSignUp> {
               ),
 
               const SizedBox(height: 8),
-
               Text(
                 "Create your Oruv account instantly with your Google profile.",
                 style: TextStyle(
@@ -68,14 +66,11 @@ class _GoogleSignUpState extends State<GoogleSignUp> {
               ),
 
               const SizedBox(height: 40),
-
               GoogleSignUpButton(
                 onPressed: () {
                   Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const HomeScreen(),
-                    ),
+                    MaterialPageRoute(builder: (context) => const HomeScreen()),
                     (route) => false,
                   );
                 },

@@ -36,7 +36,6 @@ class _AppleSignUpState extends State<AppleSignUp> {
               ),
 
               const SizedBox(height: 30),
-
               Text(
                 "Sign up with Apple",
                 style: TextStyle(
@@ -47,7 +46,6 @@ class _AppleSignUpState extends State<AppleSignUp> {
               ),
 
               const SizedBox(height: 8),
-
               Text(
                 "Create your Oruv account using your Apple ID securely.",
                 style: TextStyle(
@@ -58,14 +56,11 @@ class _AppleSignUpState extends State<AppleSignUp> {
               ),
 
               const SizedBox(height: 40),
-
               AppleSignUpButton(
                 onPressed: () {
                   Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const HomeScreen(),
-                    ),
+                    MaterialPageRoute(builder: (context) => const HomeScreen()),
                     (route) => false,
                   );
                 },
