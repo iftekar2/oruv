@@ -9,6 +9,7 @@ import 'package:oruv/components/auth/components/googleSignUpButton.dart';
 import 'package:oruv/components/auth/emailSignIn.dart';
 import 'package:oruv/components/auth/emailSignUp.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/services/google_auth_service.dart';
 
 class ScreenFour extends StatefulWidget {
   const ScreenFour({super.key});
@@ -19,6 +20,29 @@ class ScreenFour extends StatefulWidget {
 
 class _ScreenFourState extends State<ScreenFour> {
   bool _isSignUpMode = false;
+  bool _isGoogleLoading = false;
+
+  Future<void> _handleGoogleAuth() async {
+    setState(() {
+      _isGoogleLoading = true;
+    });
+
+    final res = await GoogleAuthService.signInWithGoogle(context);
+
+    if (mounted) {
+      setState(() {
+        _isGoogleLoading = false;
+      });
+
+      if (res != null && res.session != null) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -168,15 +192,7 @@ class _ScreenFourState extends State<ScreenFour> {
                 // Sign In / Sign Up buttons
                 if (!_isSignUpMode) ...[
                   GoogleSignInButton(
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const HomeScreen(),
-                        ),
-                        (route) => false,
-                      );
-                    },
+                    onPressed: _isGoogleLoading ? null : _handleGoogleAuth,
                   ),
 
                   const SizedBox(height: 14),
@@ -208,15 +224,7 @@ class _ScreenFourState extends State<ScreenFour> {
                   ),
                 ] else ...[
                   GoogleSignUpButton(
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const HomeScreen(),
-                        ),
-                        (route) => false,
-                      );
-                    },
+                    onPressed: _isGoogleLoading ? null : _handleGoogleAuth,
                   ),
 
                   const SizedBox(height: 14),

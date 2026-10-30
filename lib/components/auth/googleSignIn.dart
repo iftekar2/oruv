@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/auth/components/googleSignInButton.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/services/google_auth_service.dart';
 
 class GoogleSignIn extends StatefulWidget {
   const GoogleSignIn({super.key});
@@ -12,6 +13,30 @@ class GoogleSignIn extends StatefulWidget {
 }
 
 class _GoogleSignInState extends State<GoogleSignIn> {
+  bool _isLoading = false;
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final res = await GoogleAuthService.signInWithGoogle(context);
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (res != null && res.session != null) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -66,17 +91,14 @@ class _GoogleSignInState extends State<GoogleSignIn> {
               ),
 
               const SizedBox(height: 40),
-              GoogleSignInButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const HomeScreen(),
-                    ),
-                    (route) => false,
-                  );
-                },
-              ),
+              if (_isLoading)
+                const Center(
+                  child: CircularProgressIndicator(color: Color(0xff4063e4)),
+                )
+              else
+                GoogleSignInButton(
+                  onPressed: _handleGoogleSignIn,
+                ),
             ],
           ),
         ),
