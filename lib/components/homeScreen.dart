@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oruv/components/signout.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,7 +35,12 @@ class _HomeScreenState extends State<HomeScreen> {
             Spacer(),
 
             IconButton(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SignOut()),
+                );
+              },
               icon: Icon(Icons.person),
               style: IconButton.styleFrom(
                 backgroundColor: Colors.white,

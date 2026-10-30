@@ -46,7 +46,6 @@ class _GoogleSignInState extends State<GoogleSignIn> {
               ),
 
               const SizedBox(height: 30),
-
               Text(
                 "Sign in with Google",
                 style: TextStyle(
@@ -57,7 +56,6 @@ class _GoogleSignInState extends State<GoogleSignIn> {
               ),
 
               const SizedBox(height: 8),
-
               Text(
                 "Continue to your Oruv account using your Google profile.",
                 style: TextStyle(
@@ -68,7 +66,6 @@ class _GoogleSignInState extends State<GoogleSignIn> {
               ),
 
               const SizedBox(height: 40),
-
               GoogleSignInButton(
                 onPressed: () {
                   Navigator.pushAndRemoveUntil(
