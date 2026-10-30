@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/auth/components/appleSignUpButton.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/services/apple_auth_service.dart';
 
 class AppleSignUp extends StatefulWidget {
   const AppleSignUp({super.key});
@@ -11,6 +12,30 @@ class AppleSignUp extends StatefulWidget {
 }
 
 class _AppleSignUpState extends State<AppleSignUp> {
+  bool _isLoading = false;
+
+  Future<void> _handleAppleSignUp() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final res = await AppleAuthService.signInWithApple(context);
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (res != null && res.session != null) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -56,15 +81,14 @@ class _AppleSignUpState extends State<AppleSignUp> {
               ),
 
               const SizedBox(height: 40),
-              AppleSignUpButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    (route) => false,
-                  );
-                },
-              ),
+              if (_isLoading)
+                const Center(
+                  child: CircularProgressIndicator(color: Colors.black),
+                )
+              else
+                AppleSignUpButton(
+                  onPressed: _handleAppleSignUp,
+                ),
             ],
           ),
         ),

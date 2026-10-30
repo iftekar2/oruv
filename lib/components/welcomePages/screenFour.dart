@@ -9,6 +9,7 @@ import 'package:oruv/components/auth/components/googleSignUpButton.dart';
 import 'package:oruv/components/auth/emailSignIn.dart';
 import 'package:oruv/components/auth/emailSignUp.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/services/apple_auth_service.dart';
 import 'package:oruv/services/google_auth_service.dart';
 
 class ScreenFour extends StatefulWidget {
@@ -21,6 +22,7 @@ class ScreenFour extends StatefulWidget {
 class _ScreenFourState extends State<ScreenFour> {
   bool _isSignUpMode = false;
   bool _isGoogleLoading = false;
+  bool _isAppleLoading = false;
 
   Future<void> _handleGoogleAuth() async {
     setState(() {
@@ -32,6 +34,28 @@ class _ScreenFourState extends State<ScreenFour> {
     if (mounted) {
       setState(() {
         _isGoogleLoading = false;
+      });
+
+      if (res != null && res.session != null) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
+  Future<void> _handleAppleAuth() async {
+    setState(() {
+      _isAppleLoading = true;
+    });
+
+    final res = await AppleAuthService.signInWithApple(context);
+
+    if (mounted) {
+      setState(() {
+        _isAppleLoading = false;
       });
 
       if (res != null && res.session != null) {
@@ -192,21 +216,17 @@ class _ScreenFourState extends State<ScreenFour> {
                 // Sign In / Sign Up buttons
                 if (!_isSignUpMode) ...[
                   GoogleSignInButton(
-                    onPressed: _isGoogleLoading ? null : _handleGoogleAuth,
+                    onPressed: (_isGoogleLoading || _isAppleLoading)
+                        ? null
+                        : _handleGoogleAuth,
                   ),
 
                   const SizedBox(height: 14),
 
                   AppleSignInButton(
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const HomeScreen(),
-                        ),
-                        (route) => false,
-                      );
-                    },
+                    onPressed: (_isGoogleLoading || _isAppleLoading)
+                        ? null
+                        : _handleAppleAuth,
                   ),
 
                   const SizedBox(height: 14),
@@ -224,21 +244,17 @@ class _ScreenFourState extends State<ScreenFour> {
                   ),
                 ] else ...[
                   GoogleSignUpButton(
-                    onPressed: _isGoogleLoading ? null : _handleGoogleAuth,
+                    onPressed: (_isGoogleLoading || _isAppleLoading)
+                        ? null
+                        : _handleGoogleAuth,
                   ),
 
                   const SizedBox(height: 14),
 
                   AppleSignUpButton(
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const HomeScreen(),
-                        ),
-                        (route) => false,
-                      );
-                    },
+                    onPressed: (_isGoogleLoading || _isAppleLoading)
+                        ? null
+                        : _handleAppleAuth,
                   ),
 
                   const SizedBox(height: 14),

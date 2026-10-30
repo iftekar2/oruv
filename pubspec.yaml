@@ -41,6 +41,8 @@ dependencies:
   flutter_dotenv: ^6.0.1
   google_sign_in: ^6.2.2
   google_sign_in_ios: ^5.9.0
+  sign_in_with_apple: ^6.1.4
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:
