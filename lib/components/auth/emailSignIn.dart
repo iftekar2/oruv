@@ -5,6 +5,7 @@ import 'package:oruv/components/auth/components/authButton.dart';
 import 'package:oruv/components/auth/components/authTextField.dart';
 import 'package:oruv/components/auth/components/googleSignInButton.dart';
 import 'package:oruv/components/auth/emailSignUp.dart';
+import 'package:oruv/components/auth/forgotPassword.dart';
 import 'package:oruv/components/homeScreen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -133,7 +134,16 @@ class _EmailSignInState extends State<EmailSignIn> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ForgotPasswordScreen(
+                          initialEmail: _emailController.text.trim(),
+                        ),
+                      ),
+                    );
+                  },
                   child: Text(
                     "Forgot password?",
                     style: TextStyle(
