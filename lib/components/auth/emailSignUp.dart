@@ -6,6 +6,8 @@ import 'package:oruv/components/auth/components/authTextField.dart';
 import 'package:oruv/components/auth/components/googleSignUpButton.dart';
 import 'package:oruv/components/auth/emailSignIn.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/services/apple_auth_service.dart';
+import 'package:oruv/services/google_auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EmailSignUp extends StatefulWidget {
@@ -23,6 +25,52 @@ class _EmailSignUpState extends State<EmailSignUp> {
       TextEditingController();
 
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
+  bool _isAppleLoading = false;
+
+  Future<void> _handleGoogleAuth() async {
+    setState(() {
+      _isGoogleLoading = true;
+    });
+
+    final res = await GoogleAuthService.signInWithGoogle(context);
+
+    if (mounted) {
+      setState(() {
+        _isGoogleLoading = false;
+      });
+
+      if (res != null && res.session != null) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
+  Future<void> _handleAppleAuth() async {
+    setState(() {
+      _isAppleLoading = true;
+    });
+
+    final res = await AppleAuthService.signInWithApple(context);
+
+    if (mounted) {
+      setState(() {
+        _isAppleLoading = false;
+      });
+
+      if (res != null && res.session != null) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -192,7 +240,9 @@ class _EmailSignUpState extends State<EmailSignUp> {
               AuthButton(
                 text: "Sign Up",
                 isLoading: _isLoading,
-                onPressed: _signUp,
+                onPressed: (_isLoading || _isGoogleLoading || _isAppleLoading)
+                    ? null
+                    : _signUp,
               ),
 
               const SizedBox(height: 30),
@@ -216,24 +266,16 @@ class _EmailSignUpState extends State<EmailSignUp> {
 
               const SizedBox(height: 24),
               GoogleSignUpButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    (route) => false,
-                  );
-                },
+                onPressed: (_isLoading || _isGoogleLoading || _isAppleLoading)
+                    ? null
+                    : _handleGoogleAuth,
               ),
 
               const SizedBox(height: 14),
               AppleSignUpButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    (route) => false,
-                  );
-                },
+                onPressed: (_isLoading || _isGoogleLoading || _isAppleLoading)
+                    ? null
+                    : _handleAppleAuth,
               ),
 
               const SizedBox(height: 30),

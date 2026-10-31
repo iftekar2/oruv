@@ -7,6 +7,8 @@ import 'package:oruv/components/auth/components/googleSignInButton.dart';
 import 'package:oruv/components/auth/emailSignUp.dart';
 import 'package:oruv/components/auth/forgotPassword.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/services/apple_auth_service.dart';
+import 'package:oruv/services/google_auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EmailSignIn extends StatefulWidget {
@@ -21,6 +23,52 @@ class _EmailSignInState extends State<EmailSignIn> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
+  bool _isAppleLoading = false;
+
+  Future<void> _handleGoogleAuth() async {
+    setState(() {
+      _isGoogleLoading = true;
+    });
+
+    final res = await GoogleAuthService.signInWithGoogle(context);
+
+    if (mounted) {
+      setState(() {
+        _isGoogleLoading = false;
+      });
+
+      if (res != null && res.session != null) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
+  Future<void> _handleAppleAuth() async {
+    setState(() {
+      _isAppleLoading = true;
+    });
+
+    final res = await AppleAuthService.signInWithApple(context);
+
+    if (mounted) {
+      setState(() {
+        _isAppleLoading = false;
+      });
+
+      if (res != null && res.session != null) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -159,7 +207,9 @@ class _EmailSignInState extends State<EmailSignIn> {
               AuthButton(
                 text: "Sign In",
                 isLoading: _isLoading,
-                onPressed: _signIn,
+                onPressed: (_isLoading || _isGoogleLoading || _isAppleLoading)
+                    ? null
+                    : _signIn,
               ),
 
               const SizedBox(height: 30),
@@ -183,24 +233,16 @@ class _EmailSignInState extends State<EmailSignIn> {
 
               const SizedBox(height: 24),
               GoogleSignInButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    (route) => false,
-                  );
-                },
+                onPressed: (_isLoading || _isGoogleLoading || _isAppleLoading)
+                    ? null
+                    : _handleGoogleAuth,
               ),
 
               const SizedBox(height: 14),
               AppleSignInButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    (route) => false,
-                  );
-                },
+                onPressed: (_isLoading || _isGoogleLoading || _isAppleLoading)
+                    ? null
+                    : _handleAppleAuth,
               ),
 
               const SizedBox(height: 30),
