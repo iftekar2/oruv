@@ -57,6 +57,16 @@
 				<string>com.googleusercontent.apps.972632514619-v4mns67peboh6rroqqck8pnho04h6mvh</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>oruv</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>oruv</string>
+			</array>
+		</dict>
 	</array>
 	<!-- End of the Google Sign-in Section -->
 </dict>
