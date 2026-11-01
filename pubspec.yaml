@@ -43,6 +43,7 @@ dependencies:
   google_sign_in_ios: ^5.9.0
   sign_in_with_apple: ^6.1.4
   crypto: ^3.0.6
+  app_links: ^6.4.1
 
 dev_dependencies:
   flutter_test:

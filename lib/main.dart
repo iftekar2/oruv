@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:oruv/components/auth/resetPassword.dart';
@@ -36,25 +37,78 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late final StreamSubscription<AuthState> _authSubscription;
+  late final StreamSubscription<Uri> _linkSubscription;
+  final AppLinks _appLinks = AppLinks();
+  bool _hasNavigatedToResetPassword = false;
 
   @override
   void initState() {
     super.initState();
+    _setupAuthListener();
+    _setupDeepLinkHandling();
+  }
+
+  void _navigateToResetPassword() {
+    if (_hasNavigatedToResetPassword) return;
+    _hasNavigatedToResetPassword = true;
+
+    // Use addPostFrameCallback to ensure Navigator is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (context) => const ResetPasswordScreen(),
+        ),
+      ).then((_) {
+        // Reset flag once user pops/leaves screen
+        _hasNavigatedToResetPassword = false;
+      });
+    });
+  }
+
+  void _handleIncomingUri(Uri uri) async {
+    // If the deep link is for reset-password
+    if (uri.scheme == 'oruv' &&
+        (uri.host == 'reset-password' || uri.path.contains('reset-password'))) {
+      try {
+        await Supabase.instance.client.auth.getSessionFromUrl(uri);
+      } catch (_) {
+        // Ignored if session is already retrieved or PKCE handled
+      }
+      _navigateToResetPassword();
+    }
+  }
+
+  void _setupAuthListener() {
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final AuthChangeEvent event = data.event;
       if (event == AuthChangeEvent.passwordRecovery) {
-        navigatorKey.currentState?.push(
-          MaterialPageRoute(
-            builder: (context) => const ResetPasswordScreen(),
-          ),
-        );
+        _navigateToResetPassword();
       }
     });
+  }
+
+  Future<void> _setupDeepLinkHandling() async {
+    // Handle link that launched the app (cold start)
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        _handleIncomingUri(initialUri);
+      }
+    } catch (_) {}
+
+    // Listen to incoming links while app was already running/backgrounded
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      (uri) {
+        _handleIncomingUri(uri);
+      },
+      onError: (_) {},
+    );
   }
 
   @override
   void dispose() {
     _authSubscription.cancel();
+    _linkSubscription.cancel();
     super.dispose();
   }
 
