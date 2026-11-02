@@ -20,7 +20,7 @@ class HomeTopAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       automaticallyImplyLeading: false,
-      backgroundColor: const Color(0xFFFAF9F6),
+      backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
