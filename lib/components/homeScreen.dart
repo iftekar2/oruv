@@ -6,7 +6,9 @@ import 'package:oruv/components/home/home_bottom_nav_bar.dart';
 import 'package:oruv/components/home/home_top_app_bar.dart';
 import 'package:oruv/components/home/mindful_break_sheet.dart';
 import 'package:oruv/components/home/models/home_models.dart';
+import 'package:oruv/components/home/rule_editor_sheet.dart';
 import 'package:oruv/components/home/rules_schedules_section.dart';
+import 'package:oruv/components/home/shields_page.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -42,44 +44,34 @@ class _HomeScreenState extends State<HomeScreen> {
       ScheduleRuleModel(
         id: 'work_time',
         title: 'Work Time',
-        timeRange: '$_scheduleStart \u2013 $_scheduleEnd',
+        startTime: _scheduleStart,
+        endTime: _scheduleEnd,
         enforcementMode: _strictLock
             ? 'Strict enforcement mode'
             : 'Balanced enforcement mode',
         isActive: true,
-        badges: const [
-          AppBadgeInfo(label: 'IG', backgroundColor: Color(0xFFFADCE4)),
-          AppBadgeInfo(label: 'X', backgroundColor: Color(0xFFECEEEF)),
-          AppBadgeInfo(label: 'YT', backgroundColor: Color(0xFFFDE8B2)),
-          AppBadgeInfo(label: '+22', backgroundColor: Color(0xFFEDE8E5)),
-        ],
-        blockedCount: 25,
+        selectedAppIds: const {'instagram', 'x', 'youtube'},
+        extraBlockedCount: 22,
       ),
       const ScheduleRuleModel(
         id: 'evening_wind_down',
         title: 'Evening Wind Down',
-        timeRange: '9:30 PM \u2013 7:00 AM',
+        startTime: '9:30 PM',
+        endTime: '7:00 AM',
         enforcementMode: 'Strict enforcement mode',
         isActive: true,
-        badges: [
-          AppBadgeInfo(label: 'TT', backgroundColor: Color(0xFFEBE7E5)),
-          AppBadgeInfo(label: 'IG', backgroundColor: Color(0xFFFADCE4)),
-          AppBadgeInfo(label: '+14', backgroundColor: Color(0xFFEDE8E5)),
-        ],
-        blockedCount: 16,
+        selectedAppIds: {'tiktok', 'instagram'},
+        extraBlockedCount: 14,
       ),
       const ScheduleRuleModel(
         id: 'morning_clarity',
         title: 'Morning Clarity',
-        timeRange: '6:30 AM \u2013 8:30 AM',
+        startTime: '6:30 AM',
+        endTime: '8:30 AM',
         enforcementMode: 'Gentle reminder mode',
         isActive: true,
-        badges: [
-          AppBadgeInfo(label: 'X', backgroundColor: Color(0xFFECEEEF)),
-          AppBadgeInfo(label: 'RD', backgroundColor: Color(0xFFFDF0E5)),
-          AppBadgeInfo(label: '+8', backgroundColor: Color(0xFFEDE8E5)),
-        ],
-        blockedCount: 10,
+        selectedAppIds: {'x', 'reddit'},
+        extraBlockedCount: 8,
       ),
     ];
   }
@@ -131,9 +123,11 @@ class _HomeScreenState extends State<HomeScreen> {
             OnboardingData.instance.scheduleEnd = end;
             OnboardingData.instance.strictLock = strict;
 
-            if (_rules.isNotEmpty) {
-              _rules[0] = _rules[0].copyWith(
-                timeRange: '$start \u2013 $end',
+            final idx = _rules.indexWhere((r) => r.id == 'work_time');
+            if (idx != -1) {
+              _rules[idx] = _rules[idx].copyWith(
+                startTime: start,
+                endTime: end,
                 enforcementMode: strict
                     ? 'Strict enforcement mode'
                     : 'Balanced enforcement mode',
@@ -154,6 +148,54 @@ class _HomeScreenState extends State<HomeScreen> {
         return r;
       }).toList();
     });
+  }
+
+  void _openAddRuleSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => RuleEditorSheet(
+        onSave: (newRule) {
+          setState(() {
+            _rules = [newRule, ..._rules];
+          });
+        },
+      ),
+    );
+  }
+
+  void _openEditRuleSheet(ScheduleRuleModel rule) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => RuleEditorSheet(
+        existingRule: rule,
+        onSave: (updatedRule) {
+          setState(() {
+            _rules = _rules.map((r) {
+              if (r.id == updatedRule.id) {
+                return updatedRule;
+              }
+              return r;
+            }).toList();
+
+            if (updatedRule.id == 'work_time') {
+              _scheduleStart = updatedRule.startTime;
+              _scheduleEnd = updatedRule.endTime;
+              OnboardingData.instance.scheduleStart = updatedRule.startTime;
+              OnboardingData.instance.scheduleEnd = updatedRule.endTime;
+            }
+          });
+        },
+        onDelete: () {
+          setState(() {
+            _rules = _rules.where((r) => r.id != rule.id).toList();
+          });
+        },
+      ),
+    );
   }
 
   void _handleViewAllRules() {
@@ -184,7 +226,12 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0:
         return _buildHomeDashboard();
       case 1:
-        return _buildShieldsTabPlaceholder();
+        return ShieldsPage(
+          rules: _rules,
+          onRuleToggled: _handleRuleToggled,
+          onEditRule: _openEditRuleSheet,
+          onAddRule: _openAddRuleSheet,
+        );
       case 2:
         return _buildInsightsTabPlaceholder();
       default:
@@ -209,44 +256,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
           const SizedBox(height: 26),
 
-          // Feature 2: Rules & Schedules Section
+          // Feature 2: Rules & Schedules Section (Horizontal Row)
           RulesSchedulesSection(
             rules: _rules,
             onRuleToggled: _handleRuleToggled,
+            onRuleTap: _openEditRuleSheet,
             onViewAll: _handleViewAllRules,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShieldsTabPlaceholder() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Shields & Schedules',
-            style: GoogleFonts.lora(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1B1B1D),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Manage your active rules and blocked applications',
-            style: GoogleFonts.lora(
-              fontSize: 13.5,
-              color: const Color(0xFF6E6A6E),
-            ),
-          ),
-          const SizedBox(height: 22),
-          RulesSchedulesSection(
-            rules: _rules,
-            onRuleToggled: _handleRuleToggled,
-            onViewAll: () {},
+            isGrid: false,
           ),
         ],
       ),
