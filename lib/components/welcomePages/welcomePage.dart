@@ -140,7 +140,7 @@ class _WelcomePageState extends State<WelcomePage>
         darkHeader ? Colors.white : const Color(0xFF1E1A1D);
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: _cardBgColor,
       body: AnimatedContainer(
         duration: const Duration(milliseconds: 380),
         curve: Curves.easeInOut,
@@ -270,26 +270,28 @@ class _WelcomePageState extends State<WelcomePage>
                 ),
                 padding: EdgeInsets.fromLTRB(
                   28,
-                  16,
+                  isKeyboardOpen ? 10 : 16,
                   28,
-                  isKeyboardOpen ? 12 : 20,
+                  isKeyboardOpen ? 10 : 20,
                 ),
                 child: SafeArea(
                   top: false,
+                  bottom: !isKeyboardOpen,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       // Pull / accent handle bar
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: 48,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: _getHandleColor(_currentPage),
-                          borderRadius: BorderRadius.circular(10),
+                      if (!isKeyboardOpen)
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          width: 48,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: _getHandleColor(_currentPage),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                      ),
 
                       // Smoothly resizing upper sheet body
                       AnimatedSize(
@@ -304,7 +306,7 @@ class _WelcomePageState extends State<WelcomePage>
                         ),
                       ),
 
-                      const SizedBox(height: 18),
+                      SizedBox(height: isKeyboardOpen ? 4 : 18),
 
                       // Stationary Primary Button (or Hold to Commit on final step)
                       if (_currentPage == 7)

@@ -5,10 +5,7 @@ import 'package:oruv/components/onboarding/onboarding_data.dart';
 class UserProfilePage extends StatefulWidget {
   final VoidCallback? onSubmitted;
 
-  const UserProfilePage({
-    super.key,
-    this.onSubmitted,
-  });
+  const UserProfilePage({super.key, this.onSubmitted});
 
   @override
   State<UserProfilePage> createState() => UserProfilePageState();
@@ -116,6 +113,8 @@ class UserProfilePageState extends State<UserProfilePage> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _nameController,
+                      keyboardAppearance: Brightness.light,
+                      scrollPadding: const EdgeInsets.only(bottom: 120),
                       textCapitalization: TextCapitalization.words,
                       textInputAction: TextInputAction.next,
                       onChanged: (val) {
@@ -145,11 +144,15 @@ class UserProfilePageState extends State<UserProfilePage> {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFECE7E2)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFECE7E2),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFECE7E2)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFECE7E2),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -181,6 +184,8 @@ class UserProfilePageState extends State<UserProfilePage> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _ageController,
+                      keyboardAppearance: Brightness.light,
+                      scrollPadding: const EdgeInsets.only(bottom: 120),
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.done,
                       onChanged: (val) {
@@ -215,11 +220,15 @@ class UserProfilePageState extends State<UserProfilePage> {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFECE7E2)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFECE7E2),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFECE7E2)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFECE7E2),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),

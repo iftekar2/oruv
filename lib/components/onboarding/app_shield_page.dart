@@ -125,6 +125,7 @@ class _AppShieldPageState extends State<AppShieldPage> {
                   Expanded(
                     child: TextField(
                       controller: _searchController,
+                      keyboardAppearance: Brightness.light,
                       style: GoogleFonts.inter(fontSize: 14),
                       decoration: InputDecoration(
                         hintText: "Search apps or websites...",
