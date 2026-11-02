@@ -8,7 +8,7 @@ import 'package:oruv/components/home/home_top_app_bar.dart';
 import 'package:oruv/components/home/mindful_break_sheet.dart';
 import 'package:oruv/components/home/models/home_models.dart';
 import 'package:oruv/components/home/rules_schedules_section.dart';
-import 'package:oruv/components/home/shielded_now_card.dart';
+// import 'package:oruv/components/home/shielded_now_card.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -54,22 +54,10 @@ class _HomeScreenState extends State<HomeScreen> {
             : 'Balanced enforcement mode',
         isActive: true,
         badges: const [
-          AppBadgeInfo(
-            label: 'IG',
-            backgroundColor: Color(0xFFFADCE4),
-          ),
-          AppBadgeInfo(
-            label: 'X',
-            backgroundColor: Color(0xFFECEEEF),
-          ),
-          AppBadgeInfo(
-            label: 'YT',
-            backgroundColor: Color(0xFFFDE8B2),
-          ),
-          AppBadgeInfo(
-            label: '+22',
-            backgroundColor: Color(0xFFEDE8E5),
-          ),
+          AppBadgeInfo(label: 'IG', backgroundColor: Color(0xFFFADCE4)),
+          AppBadgeInfo(label: 'X', backgroundColor: Color(0xFFECEEEF)),
+          AppBadgeInfo(label: 'YT', backgroundColor: Color(0xFFFDE8B2)),
+          AppBadgeInfo(label: '+22', backgroundColor: Color(0xFFEDE8E5)),
         ],
         blockedCount: 25,
       ),
@@ -80,18 +68,9 @@ class _HomeScreenState extends State<HomeScreen> {
         enforcementMode: 'Strict enforcement mode',
         isActive: true,
         badges: [
-          AppBadgeInfo(
-            label: 'TT',
-            backgroundColor: Color(0xFFEBE7E5),
-          ),
-          AppBadgeInfo(
-            label: 'IG',
-            backgroundColor: Color(0xFFFADCE4),
-          ),
-          AppBadgeInfo(
-            label: '+14',
-            backgroundColor: Color(0xFFEDE8E5),
-          ),
+          AppBadgeInfo(label: 'TT', backgroundColor: Color(0xFFEBE7E5)),
+          AppBadgeInfo(label: 'IG', backgroundColor: Color(0xFFFADCE4)),
+          AppBadgeInfo(label: '+14', backgroundColor: Color(0xFFEDE8E5)),
         ],
         blockedCount: 16,
       ),
@@ -102,18 +81,9 @@ class _HomeScreenState extends State<HomeScreen> {
         enforcementMode: 'Gentle reminder mode',
         isActive: true,
         badges: [
-          AppBadgeInfo(
-            label: 'X',
-            backgroundColor: Color(0xFFECEEEF),
-          ),
-          AppBadgeInfo(
-            label: 'RD',
-            backgroundColor: Color(0xFFFDF0E5),
-          ),
-          AppBadgeInfo(
-            label: '+8',
-            backgroundColor: Color(0xFFEDE8E5),
-          ),
+          AppBadgeInfo(label: 'X', backgroundColor: Color(0xFFECEEEF)),
+          AppBadgeInfo(label: 'RD', backgroundColor: Color(0xFFFDF0E5)),
+          AppBadgeInfo(label: '+8', backgroundColor: Color(0xFFEDE8E5)),
         ],
         blockedCount: 10,
       ),
@@ -267,8 +237,9 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _isPauseActive = false;
         _pauseRemainingSeconds = 0;
-        _shieldedApps =
-            _shieldedApps.map((a) => a.copyWith(isLocked: true)).toList();
+        _shieldedApps = _shieldedApps
+            .map((a) => a.copyWith(isLocked: true))
+            .toList();
       });
       return;
     }
@@ -277,8 +248,9 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _isPauseActive = true;
       _pauseRemainingSeconds = 5 * 60;
-      _shieldedApps =
-          _shieldedApps.map((a) => a.copyWith(isLocked: false)).toList();
+      _shieldedApps = _shieldedApps
+          .map((a) => a.copyWith(isLocked: false))
+          .toList();
     });
 
     _pauseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -291,8 +263,9 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _isPauseActive = false;
           _pauseRemainingSeconds = 0;
-          _shieldedApps =
-              _shieldedApps.map((a) => a.copyWith(isLocked: true)).toList();
+          _shieldedApps = _shieldedApps
+              .map((a) => a.copyWith(isLocked: true))
+              .toList();
         });
       } else {
         setState(() {
@@ -323,10 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: const HomeTopAppBar(),
-      body: SafeArea(
-        bottom: false,
-        child: _buildActiveTabBody(),
-      ),
+      body: SafeArea(bottom: false, child: _buildActiveTabBody()),
       bottomNavigationBar: HomeBottomNavBar(
         currentIndex: _currentTabIndex,
         onTabSelected: (index) {
@@ -378,16 +348,16 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 26),
 
           // Feature 3: Shielded Now Card
-          ShieldedNowCard(
-            apps: _shieldedApps,
-            unlockTime: _scheduleEnd,
-            isPauseActive: _isPauseActive,
-            pauseRemainingSeconds: _pauseRemainingSeconds,
-            onToggleAppLock: _handleToggleAppLock,
-            onUnblockAll: _handleUnblockAll,
-            onShieldMoreApps: _handleShieldMoreApps,
-            onRequest5mPause: _handleRequest5mPause,
-          ),
+          // ShieldedNowCard(
+          //   apps: _shieldedApps,
+          //   unlockTime: _scheduleEnd,
+          //   isPauseActive: _isPauseActive,
+          //   pauseRemainingSeconds: _pauseRemainingSeconds,
+          //   onToggleAppLock: _handleToggleAppLock,
+          //   onUnblockAll: _handleUnblockAll,
+          //   onShieldMoreApps: _handleShieldMoreApps,
+          //   onRequest5mPause: _handleRequest5mPause,
+          // ),
         ],
       ),
     );
@@ -421,17 +391,18 @@ class _HomeScreenState extends State<HomeScreen> {
             onRuleToggled: _handleRuleToggled,
             onViewAll: () {},
           ),
-          const SizedBox(height: 24),
-          ShieldedNowCard(
-            apps: _shieldedApps,
-            unlockTime: _scheduleEnd,
-            isPauseActive: _isPauseActive,
-            pauseRemainingSeconds: _pauseRemainingSeconds,
-            onToggleAppLock: _handleToggleAppLock,
-            onUnblockAll: _handleUnblockAll,
-            onShieldMoreApps: _handleShieldMoreApps,
-            onRequest5mPause: _handleRequest5mPause,
-          ),
+
+          // const SizedBox(height: 24),
+          // ShieldedNowCard(
+          //   apps: _shieldedApps,
+          //   unlockTime: _scheduleEnd,
+          //   isPauseActive: _isPauseActive,
+          //   pauseRemainingSeconds: _pauseRemainingSeconds,
+          //   onToggleAppLock: _handleToggleAppLock,
+          //   onUnblockAll: _handleUnblockAll,
+          //   onShieldMoreApps: _handleShieldMoreApps,
+          //   onRequest5mPause: _handleRequest5mPause,
+          // ),
         ],
       ),
     );
