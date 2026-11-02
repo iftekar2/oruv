@@ -4,12 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/home/adjust_anchor_sheet.dart';
 import 'package:oruv/components/home/deep_work_anchor_card.dart';
 import 'package:oruv/components/home/home_bottom_nav_bar.dart';
+import 'package:oruv/components/home/home_top_app_bar.dart';
 import 'package:oruv/components/home/mindful_break_sheet.dart';
 import 'package:oruv/components/home/models/home_models.dart';
 import 'package:oruv/components/home/rules_schedules_section.dart';
 import 'package:oruv/components/home/shielded_now_card.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
-import 'package:oruv/components/signout.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -322,6 +322,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF9F6),
+      appBar: const HomeTopAppBar(),
       body: SafeArea(
         bottom: false,
         child: _buildActiveTabBody(),
@@ -329,13 +330,6 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: HomeBottomNavBar(
         currentIndex: _currentTabIndex,
         onTabSelected: (index) {
-          if (index == 3) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SignOut()),
-            );
-            return;
-          }
           setState(() {
             _currentTabIndex = index;
           });

@@ -33,11 +33,6 @@ class HomeBottomNavBar extends StatelessWidget {
         icon: Icons.bar_chart_rounded,
         activeIcon: Icons.bar_chart_rounded,
       ),
-      const _NavBarItemData(
-        label: 'Settings',
-        icon: Icons.settings_outlined,
-        activeIcon: Icons.settings_rounded,
-      ),
     ];
 
     return Container(
