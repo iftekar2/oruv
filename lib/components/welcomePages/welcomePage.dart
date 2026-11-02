@@ -90,10 +90,16 @@ class _WelcomePageState extends State<WelcomePage>
 
   void _finishToAuth() {
     FocusScope.of(context).unfocus();
+    _holdController.reset();
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ScreenFour()),
-    );
+    ).then((_) {
+      if (mounted) {
+        _holdController.reset();
+        setState(() {});
+      }
+    });
   }
 
   void _nextPage() {
@@ -239,6 +245,9 @@ class _WelcomePageState extends State<WelcomePage>
                   controller: _pageController,
                   onPageChanged: (index) {
                     FocusScope.of(context).unfocus();
+                    if (_holdController.value > 0) {
+                      _holdController.reset();
+                    }
                     setState(() {
                       _currentPage = index;
                     });
@@ -812,7 +821,12 @@ class _WelcomePageState extends State<WelcomePage>
       mainAxisSize: MainAxisSize.min,
       children: [
         GestureDetector(
-          onTapDown: (_) => _holdController.forward(),
+          onTapDown: (_) {
+            if (_holdController.status == AnimationStatus.completed) {
+              _holdController.reset();
+            }
+            _holdController.forward();
+          },
           onTapUp: (_) {
             if (_holdController.status != AnimationStatus.completed) {
               _holdController.reverse();
