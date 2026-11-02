@@ -136,8 +136,9 @@ class _WelcomePageState extends State<WelcomePage>
   Widget build(BuildContext context) {
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final darkHeader = _isDarkHeader(_currentPage);
-    final headerElementColor =
-        darkHeader ? Colors.white : const Color(0xFF1E1A1D);
+    final headerElementColor = darkHeader
+        ? Colors.white
+        : const Color(0xFF1E1A1D);
 
     return Scaffold(
       backgroundColor: _cardBgColor,
@@ -151,8 +152,10 @@ class _WelcomePageState extends State<WelcomePage>
             children: [
               // Stationary Top Header Bar
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12.0,
+                  vertical: 6.0,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -178,16 +181,7 @@ class _WelcomePageState extends State<WelcomePage>
                         ),
                       ),
                     ),
-                    AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 300),
-                      style: GoogleFonts.outfit(
-                        color: headerElementColor,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -1,
-                      ),
-                      child: const Text("f."),
-                    ),
+
                     SizedBox(
                       width: 80,
                       height: 40,
@@ -239,13 +233,9 @@ class _WelcomePageState extends State<WelcomePage>
                       key: _userProfileKey,
                       onSubmitted: _nextPage,
                     ),
-                    FocusPrioritiesPage(
-                      onChanged: () => setState(() {}),
-                    ),
+                    FocusPrioritiesPage(onChanged: () => setState(() {})),
                     const TimeAnalysisPage(),
-                    AppShieldPage(
-                      onChanged: () => setState(() {}),
-                    ),
+                    AppShieldPage(onChanged: () => setState(() {})),
                     const FocusBoundaryPage(),
                   ],
                 ),
@@ -302,7 +292,10 @@ class _WelcomePageState extends State<WelcomePage>
                           duration: const Duration(milliseconds: 240),
                           switchInCurve: Curves.easeOut,
                           switchOutCurve: Curves.easeIn,
-                          child: _buildSheetContent(_currentPage, isKeyboardOpen),
+                          child: _buildSheetContent(
+                            _currentPage,
+                            isKeyboardOpen,
+                          ),
                         ),
                       ),
 
@@ -469,10 +462,7 @@ class _WelcomePageState extends State<WelcomePage>
           ),
         ),
         const SizedBox(height: 24),
-        SizedBox(
-          height: 48,
-          child: Center(child: metricsChild),
-        ),
+        SizedBox(height: 48, child: Center(child: metricsChild)),
         const SizedBox(height: 8),
       ],
     );
@@ -512,11 +502,7 @@ class _WelcomePageState extends State<WelcomePage>
               ],
             ),
           ),
-          Container(
-            height: 38,
-            width: 1,
-            color: const Color(0xFFE5DFD9),
-          ),
+          Container(height: 38, width: 1, color: const Color(0xFFE5DFD9)),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -563,10 +549,7 @@ class _WelcomePageState extends State<WelcomePage>
                   decoration: BoxDecoration(
                     color: const Color(0xFF8C6D73),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: _cardBgColor,
-                      width: 2,
-                    ),
+                    border: Border.all(color: _cardBgColor, width: 2),
                   ),
                 ),
               ),
@@ -578,10 +561,7 @@ class _WelcomePageState extends State<WelcomePage>
                   decoration: BoxDecoration(
                     color: const Color(0xFF077C6A),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: _cardBgColor,
-                      width: 2,
-                    ),
+                    border: Border.all(color: _cardBgColor, width: 2),
                   ),
                 ),
               ),
@@ -593,10 +573,7 @@ class _WelcomePageState extends State<WelcomePage>
                   decoration: BoxDecoration(
                     color: const Color(0xFFF1BE41),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: _cardBgColor,
-                      width: 2,
-                    ),
+                    border: Border.all(color: _cardBgColor, width: 2),
                   ),
                 ),
               ),

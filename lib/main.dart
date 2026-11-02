@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:oruv/components/auth/resetPassword.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/components/onboarding/onboarding_data.dart';
+import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/components/welcomePages/welcomePage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -40,6 +42,7 @@ class _MyAppState extends State<MyApp> {
   late final StreamSubscription<Uri> _linkSubscription;
   final AppLinks _appLinks = AppLinks();
   bool _hasNavigatedToResetPassword = false;
+  bool _pendingEmailConfirmation = false;
 
   @override
   void initState() {
@@ -65,16 +68,46 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  void _navigateToHomeAfterConfirm() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (OnboardingData.instance.fullName.isNotEmpty) {
+        await OnboardingService.saveOnboardingData();
+      }
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => const HomeScreen(),
+        ),
+        (route) => false,
+      );
+    });
+  }
+
   void _handleIncomingUri(Uri uri) async {
-    // If the deep link is for reset-password
-    if (uri.scheme == 'oruv' &&
-        (uri.host == 'reset-password' || uri.path.contains('reset-password'))) {
+    if (uri.scheme != 'oruv') return;
+
+    // 1. If the deep link is for reset-password
+    if (uri.host == 'reset-password' || uri.path.contains('reset-password')) {
       try {
         await Supabase.instance.client.auth.getSessionFromUrl(uri);
       } catch (_) {
         // Ignored if session is already retrieved or PKCE handled
       }
       _navigateToResetPassword();
+      return;
+    }
+
+    // 2. If the deep link is for email confirmation (oruv://login-callback)
+    if (uri.host == 'login-callback' || uri.path.contains('login-callback')) {
+      _pendingEmailConfirmation = true;
+      try {
+        await Supabase.instance.client.auth.getSessionFromUrl(uri);
+      } catch (_) {
+        // Ignored if supabase_flutter already exchanged the PKCE code
+      }
+      if (Supabase.instance.client.auth.currentSession != null) {
+        _pendingEmailConfirmation = false;
+        _navigateToHomeAfterConfirm();
+      }
     }
   }
 
@@ -83,6 +116,9 @@ class _MyAppState extends State<MyApp> {
       final AuthChangeEvent event = data.event;
       if (event == AuthChangeEvent.passwordRecovery) {
         _navigateToResetPassword();
+      } else if (event == AuthChangeEvent.signedIn && _pendingEmailConfirmation) {
+        _pendingEmailConfirmation = false;
+        _navigateToHomeAfterConfirm();
       }
     });
   }

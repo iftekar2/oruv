@@ -33,44 +33,6 @@ class TimeAnalysisPage extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Screen time analysis pill tag
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.12),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF10B981),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  "Screen time analysis",
-                  style: GoogleFonts.inter(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-
           // At X hours a day...
           RichText(
             textAlign: TextAlign.center,
@@ -97,9 +59,7 @@ class TimeAnalysisPage extends StatelessWidget {
                     color: Color(0xFF10B981),
                   ),
                 ),
-                const TextSpan(
-                  text: "looking at your screen this year.",
-                ),
+                const TextSpan(text: "looking at your screen this year."),
               ],
             ),
           ),
@@ -128,32 +88,6 @@ class TimeAnalysisPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Hourglass divider
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 44,
-                height: 1,
-                color: Colors.white.withValues(alpha: 0.2),
-              ),
-              const SizedBox(width: 14),
-              Text(
-                "⌛",
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Container(
-                width: 44,
-                height: 1,
-                color: Colors.white.withValues(alpha: 0.2),
-              ),
-            ],
-          ),
         ],
       ),
     );

@@ -129,6 +129,7 @@ class _EmailSignUpState extends State<EmailSignUp> {
         email: email,
         password: password,
         data: onboardingMap,
+        emailRedirectTo: 'oruv://login-callback',
       );
 
       if (!mounted) return;
