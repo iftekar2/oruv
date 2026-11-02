@@ -79,6 +79,9 @@ flutter:
     - lib/icons/twitter.png
     - lib/icons/youtube.png
     - lib/components/images/welcome-image.jpg
+    - lib/components/welcomePages/images/ob-block.jpg
+    - lib/components/welcomePages/images/ob-schedule.jpg
+    - lib/components/welcomePages/images/ob-focus.jpg
     
  
 
