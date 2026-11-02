@@ -324,35 +324,52 @@ class _FocusBoundaryPageState extends State<FocusBoundaryPage> {
                 const SizedBox(height: 14),
 
                 // Apps count summary
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.apps_rounded,
-                      size: 20,
-                      color: Color(0xFF1E1A1D),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "25 Apps locked automatically",
-                      style: GoogleFonts.dmSerifDisplay(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1E1A1D),
-                      ),
-                    ),
-                    const Spacer(),
-                    Row(
+                Builder(
+                  builder: (context) {
+                    final count = OnboardingData.instance.totalSelectedAppsCount;
+                    final displayCount = count > 0 ? count : 25;
+                    final extraCount = displayCount > 3 ? displayCount - 3 : 0;
+
+                    return Row(
                       children: [
-                        _buildAppBadge("in", const Color(0xFF0077B5)),
-                        const SizedBox(width: 3),
-                        _buildAppBadge("tt", Colors.black),
-                        const SizedBox(width: 3),
-                        _buildAppBadge("yt", const Color(0xFFFF0000)),
-                        const SizedBox(width: 3),
-                        _buildAppBadge("+22", const Color(0xFF281F24)),
+                        const Icon(
+                          Icons.apps_rounded,
+                          size: 20,
+                          color: Color(0xFF1E1A1D),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "$displayCount ${displayCount == 1 ? 'App' : 'Apps'} locked automatically",
+                          style: GoogleFonts.dmSerifDisplay(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1E1A1D),
+                          ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            _buildAppBadge("in", const Color(0xFF0077B5)),
+                            if (displayCount >= 2) ...[
+                              const SizedBox(width: 3),
+                              _buildAppBadge("tt", Colors.black),
+                            ],
+                            if (displayCount >= 3) ...[
+                              const SizedBox(width: 3),
+                              _buildAppBadge("yt", const Color(0xFFFF0000)),
+                            ],
+                            if (extraCount > 0) ...[
+                              const SizedBox(width: 3),
+                              _buildAppBadge(
+                                "+$extraCount",
+                                const Color(0xFF281F24),
+                              ),
+                            ],
+                          ],
+                        ),
                       ],
-                    ),
-                  ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 18),
 

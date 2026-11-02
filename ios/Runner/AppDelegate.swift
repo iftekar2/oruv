@@ -1,5 +1,138 @@
 import Flutter
 import UIKit
+import SwiftUI
+#if canImport(FamilyControls)
+import FamilyControls
+import ManagedSettings
+#endif
+
+#if canImport(FamilyControls)
+@available(iOS 16.0, *)
+class ScreenTimeManager: ObservableObject {
+  static let shared = ScreenTimeManager()
+  private let storageKey = "oruv_family_activity_selection"
+
+  var methodChannel: FlutterMethodChannel?
+
+  @Published var activitySelection = FamilyActivitySelection() {
+    didSet {
+      saveSelection()
+      notifyFlutter()
+    }
+  }
+
+  private init() {
+    if let data = UserDefaults.standard.data(forKey: storageKey),
+       let decoded = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: data) {
+      self.activitySelection = decoded
+    }
+  }
+
+  func saveSelection() {
+    if let encoded = try? PropertyListEncoder().encode(activitySelection) {
+      UserDefaults.standard.set(encoded, forKey: storageKey)
+    }
+  }
+
+  func notifyFlutter() {
+    let appsCount = activitySelection.applicationTokens.count
+    let categoriesCount = activitySelection.categoryTokens.count
+    let domainsCount = activitySelection.webDomainTokens.count
+    let totalCount = appsCount + categoriesCount + domainsCount
+
+    DispatchQueue.main.async { [weak self] in
+      self?.methodChannel?.invokeMethod("onSelectionChanged", arguments: [
+        "appsCount": appsCount,
+        "categoriesCount": categoriesCount,
+        "domainsCount": domainsCount,
+        "totalCount": totalCount
+      ])
+    }
+  }
+
+  func applyShield() {
+    let store = ManagedSettingsStore()
+    store.shield.applications = activitySelection.applicationTokens.isEmpty
+      ? nil
+      : activitySelection.applicationTokens
+    store.shield.applicationCategories = activitySelection.categoryTokens.isEmpty
+      ? nil
+      : .specific(activitySelection.categoryTokens)
+    store.shield.webDomains = activitySelection.webDomainTokens.isEmpty
+      ? nil
+      : activitySelection.webDomainTokens
+  }
+}
+
+@available(iOS 16.0, *)
+struct NativeFamilyActivityPickerView: View {
+  @ObservedObject var manager = ScreenTimeManager.shared
+
+  var body: some View {
+    FamilyActivityPicker(selection: $manager.activitySelection)
+      .preferredColorScheme(.dark)
+      .background(Color(red: 0.11, green: 0.11, blue: 0.12))
+  }
+}
+
+class FamilyActivityPickerPlatformView: NSObject, FlutterPlatformView {
+  private let containerView: UIView
+  private var hostingController: UIViewController?
+
+  init(frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) {
+    self.containerView = UIView(frame: frame)
+    self.containerView.backgroundColor = UIColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1.0)
+    super.init()
+
+    #if canImport(FamilyControls)
+    if #available(iOS 16.0, *) {
+      let swiftUIView = NativeFamilyActivityPickerView()
+      let hosting = UIHostingController(rootView: swiftUIView)
+      hosting.view.backgroundColor = UIColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1.0)
+      hosting.view.translatesAutoresizingMaskIntoConstraints = false
+      self.containerView.addSubview(hosting.view)
+
+      NSLayoutConstraint.activate([
+        hosting.view.topAnchor.constraint(equalTo: self.containerView.topAnchor),
+        hosting.view.bottomAnchor.constraint(equalTo: self.containerView.bottomAnchor),
+        hosting.view.leadingAnchor.constraint(equalTo: self.containerView.leadingAnchor),
+        hosting.view.trailingAnchor.constraint(equalTo: self.containerView.trailingAnchor)
+      ])
+      self.hostingController = hosting
+    }
+    #endif
+  }
+
+  func view() -> UIView {
+    return containerView
+  }
+}
+
+class FamilyActivityPickerFactory: NSObject, FlutterPlatformViewFactory {
+  private let messenger: FlutterBinaryMessenger
+
+  init(messenger: FlutterBinaryMessenger) {
+    self.messenger = messenger
+    super.init()
+  }
+
+  func create(
+    withFrame frame: CGRect,
+    viewIdentifier viewId: Int64,
+    arguments args: Any?
+  ) -> FlutterPlatformView {
+    return FamilyActivityPickerPlatformView(
+      frame: frame,
+      viewIdentifier: viewId,
+      arguments: args
+    )
+  }
+
+  func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
+    return FlutterStandardMessageCodec.sharedInstance()
+  }
+}
+#endif
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -7,6 +140,68 @@ import UIKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let screenTimeChannel = FlutterMethodChannel(
+        name: "oruv/screen_time",
+        binaryMessenger: controller.binaryMessenger
+      )
+
+      #if canImport(FamilyControls)
+      if #available(iOS 16.0, *) {
+        ScreenTimeManager.shared.methodChannel = screenTimeChannel
+      }
+      if let registrar = self.registrar(forPlugin: "OruvFamilyActivityPicker") {
+        let factory = FamilyActivityPickerFactory(messenger: registrar.messenger())
+        registrar.register(factory, withId: "oruv/family_activity_picker")
+      }
+      #endif
+
+      screenTimeChannel.setMethodCallHandler { call, result in
+        #if canImport(FamilyControls)
+        if #available(iOS 16.0, *) {
+          switch call.method {
+          case "requestAuthorization":
+            Task {
+              do {
+                try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+                let isApproved = AuthorizationCenter.shared.authorizationStatus == .approved
+                DispatchQueue.main.async {
+                  ScreenTimeManager.shared.notifyFlutter()
+                  result([
+                    "authorized": isApproved
+                  ])
+                }
+              } catch {
+                DispatchQueue.main.async {
+                  result([
+                    "authorized": false,
+                    "error": error.localizedDescription
+                  ])
+                }
+              }
+            }
+          case "checkAuthorizationStatus":
+            let isApproved = AuthorizationCenter.shared.authorizationStatus == .approved
+            ScreenTimeManager.shared.notifyFlutter()
+            result([
+              "authorized": isApproved
+            ])
+          case "applyShield":
+            ScreenTimeManager.shared.applyShield()
+            result(true)
+          default:
+            result(FlutterMethodNotImplemented)
+          }
+          return
+        }
+        #endif
+        result([
+          "authorized": false,
+          "error": "Screen Time API requires iOS 16.0 or newer."
+        ])
+      }
+    }
+
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

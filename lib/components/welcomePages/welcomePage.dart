@@ -27,6 +27,8 @@ class _WelcomePageState extends State<WelcomePage>
   final PageController _pageController = PageController();
   final GlobalKey<UserProfilePageState> _userProfileKey =
       GlobalKey<UserProfilePageState>();
+  final GlobalKey<AppShieldPageState> _appShieldKey =
+      GlobalKey<AppShieldPageState>();
 
   int _currentPage = 0;
   late AnimationController _holdController;
@@ -62,6 +64,8 @@ class _WelcomePageState extends State<WelcomePage>
         return const Color(0xFFF1BE41);
       case 5:
         return const Color(0xFF161616);
+      case 6:
+        return const Color(0xFF101312);
       default:
         return const Color(0xFFFAF8F5);
     }
@@ -81,7 +85,7 @@ class _WelcomePageState extends State<WelcomePage>
   }
 
   bool _isDarkHeader(int page) {
-    return page == 0 || page == 1 || page == 2 || page == 5;
+    return page == 0 || page == 1 || page == 2 || page == 5 || page == 6;
   }
 
   void _finishToAuth() {
@@ -101,6 +105,12 @@ class _WelcomePageState extends State<WelcomePage>
       if (!isValid) return;
     }
 
+    // Request Screen Time permission first on Step 6 before advancing
+    if (_currentPage == 6 && !OnboardingData.instance.screenTimeAuthorized) {
+      _appShieldKey.currentState?.requestScreenTimePermission();
+      return;
+    }
+
     if (_currentPage < _totalSteps - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 380),
@@ -113,6 +123,12 @@ class _WelcomePageState extends State<WelcomePage>
 
   void _prevPage() {
     FocusScope.of(context).unfocus();
+    if (_currentPage == 6 && OnboardingData.instance.screenTimeAuthorized) {
+      setState(() {
+        OnboardingData.instance.screenTimeAuthorized = false;
+      });
+      return;
+    }
     if (_currentPage > 0) {
       _pageController.previousPage(
         duration: const Duration(milliseconds: 380),
@@ -126,7 +142,9 @@ class _WelcomePageState extends State<WelcomePage>
       case 5:
         return "I Want My Time Back";
       case 6:
-        return "Set My Focus Rules";
+        return OnboardingData.instance.screenTimeAuthorized
+            ? "Continue"
+            : "Connect Screen Time";
       default:
         return "Continue";
     }
@@ -235,7 +253,10 @@ class _WelcomePageState extends State<WelcomePage>
                     ),
                     FocusPrioritiesPage(onChanged: () => setState(() {})),
                     const TimeAnalysisPage(),
-                    AppShieldPage(onChanged: () => setState(() {})),
+                    AppShieldPage(
+                      key: _appShieldKey,
+                      onChanged: () => setState(() {}),
+                    ),
                     const FocusBoundaryPage(),
                   ],
                 ),
@@ -739,44 +760,48 @@ class _WelcomePageState extends State<WelcomePage>
   }
 
   Widget _buildAppShieldStatusRow() {
-    final cats = OnboardingData.instance.selectedCategories;
-    int appCount = 0;
-    if (cats.contains('Social Media & Feeds')) appCount += 14;
-    if (cats.contains('Endless Video & Streaming')) appCount += 6;
-    if (cats.contains('News & Infinite Browsers')) appCount += 5;
-    if (cats.contains('Gaming & Casual Puzzles')) appCount += 3;
+    if (!OnboardingData.instance.screenTimeAuthorized) {
+      return const SizedBox.shrink(key: ValueKey('app_shield_perm'));
+    }
+
+    final appCount = OnboardingData.instance.totalSelectedAppsCount;
 
     return Padding(
       key: const ValueKey('app_shield_status'),
       padding: const EdgeInsets.only(top: 14.0, left: 4.0, right: 4.0),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             width: 8,
             height: 8,
-            decoration: const BoxDecoration(
-              color: Color(0xFF077C6A),
+            decoration: BoxDecoration(
+              color: appCount > 0
+                  ? const Color(0xFF077C6A)
+                  : const Color(0xFFB5AFB3),
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 8),
           Text(
-            "$appCount Distractions Shielded",
+            "$appCount ${appCount == 1 ? 'App' : 'Apps'} Selected",
             style: GoogleFonts.inter(
-              fontSize: 13,
+              fontSize: 13.5,
               fontWeight: FontWeight.w700,
               color: const Color(0xFF1E1A1D),
             ),
           ),
-          const Spacer(),
-          Text(
-            "~3.5h saved daily",
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFF8A8287),
+          if (appCount > 0) ...[
+            const Spacer(),
+            Text(
+              "~3.5h saved daily",
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF8A8287),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
