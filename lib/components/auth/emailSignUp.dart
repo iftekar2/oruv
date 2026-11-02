@@ -6,6 +6,8 @@ import 'package:oruv/components/auth/components/authTextField.dart';
 import 'package:oruv/components/auth/components/googleSignUpButton.dart';
 import 'package:oruv/components/auth/emailSignIn.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/components/onboarding/onboarding_data.dart';
+import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/services/apple_auth_service.dart';
 import 'package:oruv/services/google_auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -18,7 +20,9 @@ class EmailSignUp extends StatefulWidget {
 }
 
 class _EmailSignUpState extends State<EmailSignUp> {
-  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController(
+    text: OnboardingData.instance.fullName,
+  );
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
@@ -118,15 +122,20 @@ class _EmailSignUpState extends State<EmailSignUp> {
     });
 
     try {
+      final onboardingMap = OnboardingData.instance.toMap();
+      onboardingMap['full_name'] = name;
+
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
-        data: {'full_name': name},
+        data: onboardingMap,
       );
 
       if (!mounted) return;
 
       if (response.session != null) {
+        await OnboardingService.saveOnboardingData();
+        if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),

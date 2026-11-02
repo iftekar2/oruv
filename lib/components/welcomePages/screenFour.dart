@@ -9,6 +9,7 @@ import 'package:oruv/components/auth/components/googleSignUpButton.dart';
 import 'package:oruv/components/auth/emailSignIn.dart';
 import 'package:oruv/components/auth/emailSignUp.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/services/apple_auth_service.dart';
 import 'package:oruv/services/google_auth_service.dart';
 
@@ -37,6 +38,8 @@ class _ScreenFourState extends State<ScreenFour> {
       });
 
       if (res != null && res.session != null) {
+        await OnboardingService.saveOnboardingData();
+        if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -59,6 +62,8 @@ class _ScreenFourState extends State<ScreenFour> {
       });
 
       if (res != null && res.session != null) {
+        await OnboardingService.saveOnboardingData();
+        if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),

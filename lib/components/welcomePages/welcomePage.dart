@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oruv/components/onboarding/onboarding_flow.dart';
 import 'package:oruv/components/welcomePages/screenFour.dart';
 import 'package:oruv/components/welcomePages/screenOne.dart';
 import 'package:oruv/components/welcomePages/screenThree.dart';
@@ -19,6 +20,13 @@ class _WelcomePageState extends State<WelcomePage> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _navigateToOnboarding() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const OnboardingFlow()),
+    );
   }
 
   void _navigateToAuth() {
@@ -58,7 +66,7 @@ class _WelcomePageState extends State<WelcomePage> {
             onSkip: _navigateToAuth,
           ),
           ScreenThree(
-            onGetStarted: _navigateToAuth,
+            onGetStarted: _navigateToOnboarding,
             onSkip: _navigateToAuth,
           ),
         ],
@@ -66,3 +74,4 @@ class _WelcomePageState extends State<WelcomePage> {
     );
   }
 }
+

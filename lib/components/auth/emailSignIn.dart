@@ -7,6 +7,8 @@ import 'package:oruv/components/auth/components/googleSignInButton.dart';
 import 'package:oruv/components/auth/emailSignUp.dart';
 import 'package:oruv/components/auth/forgotPassword.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/components/onboarding/onboarding_data.dart';
+import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/services/apple_auth_service.dart';
 import 'package:oruv/services/google_auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -98,6 +100,11 @@ class _EmailSignInState extends State<EmailSignIn> {
         password: password,
       );
 
+      if (!mounted) return;
+
+      if (OnboardingData.instance.fullName.isNotEmpty) {
+        await OnboardingService.saveOnboardingData();
+      }
       if (!mounted) return;
 
       Navigator.pushAndRemoveUntil(
