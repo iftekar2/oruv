@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/home/adjust_anchor_sheet.dart';
@@ -8,7 +7,6 @@ import 'package:oruv/components/home/home_top_app_bar.dart';
 import 'package:oruv/components/home/mindful_break_sheet.dart';
 import 'package:oruv/components/home/models/home_models.dart';
 import 'package:oruv/components/home/rules_schedules_section.dart';
-// import 'package:oruv/components/home/shielded_now_card.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -26,12 +24,8 @@ class _HomeScreenState extends State<HomeScreen> {
   late bool _strictLock;
 
   bool _isOnMindfulBreak = false;
-  bool _isPauseActive = false;
-  int _pauseRemainingSeconds = 0;
-  Timer? _pauseTimer;
 
   late List<ScheduleRuleModel> _rules;
-  late List<ShieldedAppModel> _shieldedApps;
 
   @override
   void initState() {
@@ -88,55 +82,6 @@ class _HomeScreenState extends State<HomeScreen> {
         blockedCount: 10,
       ),
     ];
-
-    _shieldedApps = const [
-      ShieldedAppModel(
-        id: 'insta',
-        name: 'Insta',
-        iconType: ShieldedAppIconType.instagram,
-        backgroundColor: Color(0xFFFCEEF2),
-        iconColor: Color(0xFFD83B72),
-        isLocked: true,
-      ),
-      ShieldedAppModel(
-        id: 'tiktok',
-        name: 'TikTok',
-        iconType: ShieldedAppIconType.tiktok,
-        backgroundColor: Color(0xFFEBE7E5),
-        iconColor: Color(0xFF1B1B1D),
-        isLocked: true,
-      ),
-      ShieldedAppModel(
-        id: 'x',
-        name: 'X',
-        iconType: ShieldedAppIconType.x,
-        backgroundColor: Color(0xFFE5E3E3),
-        iconColor: Color(0xFF1B1B1D),
-        isLocked: true,
-      ),
-      ShieldedAppModel(
-        id: 'youtube',
-        name: 'YouTube',
-        iconType: ShieldedAppIconType.youtube,
-        backgroundColor: Color(0xFFFDECEC),
-        iconColor: Color(0xFFD92B2B),
-        isLocked: true,
-      ),
-      ShieldedAppModel(
-        id: 'reddit',
-        name: 'Reddit',
-        iconType: ShieldedAppIconType.reddit,
-        backgroundColor: Color(0xFFFDF0E5),
-        iconColor: Color(0xFFE05A1B),
-        isLocked: true,
-      ),
-    ];
-  }
-
-  @override
-  void dispose() {
-    _pauseTimer?.cancel();
-    super.dispose();
   }
 
   void _handleTakeMindfulBreak() {
@@ -211,80 +156,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _handleToggleAppLock(String appId) {
-    setState(() {
-      _shieldedApps = _shieldedApps.map((app) {
-        if (app.id == appId) {
-          return app.copyWith(isLocked: !app.isLocked);
-        }
-        return app;
-      }).toList();
-    });
-  }
-
-  void _handleUnblockAll() {
-    final allUnlocked = _shieldedApps.every((a) => !a.isLocked);
-    setState(() {
-      _shieldedApps = _shieldedApps
-          .map((a) => a.copyWith(isLocked: allUnlocked))
-          .toList();
-    });
-  }
-
-  void _handleRequest5mPause() {
-    if (_isPauseActive) {
-      _pauseTimer?.cancel();
-      setState(() {
-        _isPauseActive = false;
-        _pauseRemainingSeconds = 0;
-        _shieldedApps = _shieldedApps
-            .map((a) => a.copyWith(isLocked: true))
-            .toList();
-      });
-      return;
-    }
-
-    _pauseTimer?.cancel();
-    setState(() {
-      _isPauseActive = true;
-      _pauseRemainingSeconds = 5 * 60;
-      _shieldedApps = _shieldedApps
-          .map((a) => a.copyWith(isLocked: false))
-          .toList();
-    });
-
-    _pauseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_pauseRemainingSeconds <= 1) {
-        timer.cancel();
-        setState(() {
-          _isPauseActive = false;
-          _pauseRemainingSeconds = 0;
-          _shieldedApps = _shieldedApps
-              .map((a) => a.copyWith(isLocked: true))
-              .toList();
-        });
-      } else {
-        setState(() {
-          _pauseRemainingSeconds--;
-        });
-      }
-    });
-  }
-
-  void _handleShieldMoreApps() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Shield selection updated.'),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
   void _handleViewAllRules() {
     setState(() {
       _currentTabIndex = 1;
@@ -344,20 +215,6 @@ class _HomeScreenState extends State<HomeScreen> {
             onRuleToggled: _handleRuleToggled,
             onViewAll: _handleViewAllRules,
           ),
-
-          const SizedBox(height: 26),
-
-          // Feature 3: Shielded Now Card
-          // ShieldedNowCard(
-          //   apps: _shieldedApps,
-          //   unlockTime: _scheduleEnd,
-          //   isPauseActive: _isPauseActive,
-          //   pauseRemainingSeconds: _pauseRemainingSeconds,
-          //   onToggleAppLock: _handleToggleAppLock,
-          //   onUnblockAll: _handleUnblockAll,
-          //   onShieldMoreApps: _handleShieldMoreApps,
-          //   onRequest5mPause: _handleRequest5mPause,
-          // ),
         ],
       ),
     );
@@ -391,18 +248,6 @@ class _HomeScreenState extends State<HomeScreen> {
             onRuleToggled: _handleRuleToggled,
             onViewAll: () {},
           ),
-
-          // const SizedBox(height: 24),
-          // ShieldedNowCard(
-          //   apps: _shieldedApps,
-          //   unlockTime: _scheduleEnd,
-          //   isPauseActive: _isPauseActive,
-          //   pauseRemainingSeconds: _pauseRemainingSeconds,
-          //   onToggleAppLock: _handleToggleAppLock,
-          //   onUnblockAll: _handleUnblockAll,
-          //   onShieldMoreApps: _handleShieldMoreApps,
-          //   onRequest5mPause: _handleRequest5mPause,
-          // ),
         ],
       ),
     );

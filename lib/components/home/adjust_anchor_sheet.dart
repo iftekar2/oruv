@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:oruv/components/onboarding/onboarding_data.dart';
 
 class AdjustAnchorSheet extends StatefulWidget {
   final String initialStartTime;
@@ -57,8 +60,85 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
     }
   }
 
+  void _openAppShieldPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1C1C1E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return SizedBox(
+          height: MediaQuery.of(ctx).size.height * 0.75,
+          child: SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Shielded Apps',
+                        style: GoogleFonts.lora(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          if (mounted) setState(() {});
+                        },
+                        child: Text(
+                          'Done',
+                          style: GoogleFonts.lora(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF10B981),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Platform.isIOS
+                      ? const UiKitView(
+                          viewType: 'oruv/family_activity_picker',
+                          creationParamsCodec: StandardMessageCodec(),
+                        )
+                      : Center(
+                          child: Text(
+                            'Apple Screen Time picker is available on iOS devices.',
+                            style: GoogleFonts.lora(color: Colors.white70),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final selectedCount = OnboardingData.instance.totalSelectedAppsCount;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
       decoration: const BoxDecoration(
@@ -92,7 +172,7 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Customize your active focus schedule window',
+              'Customize your active focus schedule and shielded apps',
               style: GoogleFonts.lora(
                 fontSize: 13,
                 color: _mutedText,
@@ -195,6 +275,60 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
               ],
             ),
             const SizedBox(height: 14),
+
+            // Manage Locked / Unblocked Apps Row
+            GestureDetector(
+              onTap: _openAppShieldPicker,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: _cardBorder),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.apps_rounded,
+                      size: 20,
+                      color: _accentGreen,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Locked & Unblocked Apps',
+                            style: GoogleFonts.lora(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _primaryText,
+                            ),
+                          ),
+                          Text(
+                            selectedCount > 0
+                                ? '$selectedCount apps currently shielded'
+                                : 'Tap to lock or unblock apps',
+                            style: GoogleFonts.lora(
+                              fontSize: 11.5,
+                              color: _mutedText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: _mutedText,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -272,4 +406,3 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
     );
   }
 }
-
