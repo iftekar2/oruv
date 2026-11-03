@@ -281,9 +281,15 @@ class ScheduleRuleModel {
   }
 
   List<AppBadgeInfo> get badges {
-    final selectedOptions = BlockableAppOption.catalog
+    var selectedOptions = BlockableAppOption.catalog
         .where((opt) => selectedAppIds.contains(opt.id))
         .toList();
+
+    if (selectedOptions.isEmpty && blockedCount > 0) {
+      selectedOptions = BlockableAppOption.catalog
+          .take(blockedCount.clamp(0, 3))
+          .toList();
+    }
 
     final shown = selectedOptions.take(3).map((opt) {
       return AppBadgeInfo(

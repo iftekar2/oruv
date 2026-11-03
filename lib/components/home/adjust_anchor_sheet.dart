@@ -27,6 +27,7 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
   late String _startTime;
   late String _endTime;
   late bool _strictLock;
+  bool _isPickerOpen = false;
 
   static const Color _accentGreen = Color(0xFF1D6F58);
   static const Color _primaryText = Color(0xFF1B1B1D);
@@ -60,8 +61,12 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
     }
   }
 
-  void _openAppShieldPicker() {
-    showModalBottomSheet(
+  Future<void> _openAppShieldPicker() async {
+    setState(() {
+      _isPickerOpen = true;
+    });
+
+    await showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1C1C1E),
       isScrollControlled: true,
@@ -100,7 +105,6 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
                       TextButton(
                         onPressed: () {
                           Navigator.pop(ctx);
-                          if (mounted) setState(() {});
                         },
                         child: Text(
                           'Done',
@@ -133,6 +137,12 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
         );
       },
     );
+
+    if (mounted) {
+      setState(() {
+        _isPickerOpen = false;
+      });
+    }
   }
 
   @override
@@ -282,6 +292,7 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                clipBehavior: Clip.hardEdge,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(18),
@@ -343,41 +354,50 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
                         thickness: 1,
                       ),
                       const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: const BoxDecoration(
-                              color: _accentGreen,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '$selectedCount ${selectedCount == 1 ? 'App' : 'Apps'} chosen to block',
-                              style: GoogleFonts.lora(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: _primaryText,
+                      SizedBox(
+                        height: 28,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: _accentGreen,
+                                shape: BoxShape.circle,
                               ),
                             ),
-                          ),
-                          if (Platform.isIOS)
-                            SizedBox(
-                              width: 110,
-                              height: 28,
-                              child: IgnorePointer(
-                                child: UiKitView(
-                                  key: ValueKey<int>(selectedCount),
-                                  viewType: 'oruv/selected_apps_icons',
-                                  creationParamsCodec:
-                                      const StandardMessageCodec(),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '$selectedCount ${selectedCount == 1 ? 'App' : 'Apps'} chosen to block',
+                                style: GoogleFonts.lora(
+                                  fontSize: 12.5,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w600,
+                                  color: _primaryText,
                                 ),
                               ),
                             ),
-                        ],
+                            if (Platform.isIOS && !_isPickerOpen)
+                              ClipRect(
+                                child: SizedBox(
+                                  width: 110,
+                                  height: 28,
+                                  child: IgnorePointer(
+                                    child: UiKitView(
+                                      key: ValueKey<int>(selectedCount),
+                                      viewType: 'oruv/selected_apps_icons',
+                                      creationParamsCodec:
+                                          const StandardMessageCodec(),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else if (Platform.isIOS)
+                              const SizedBox(width: 110, height: 28),
+                          ],
+                        ),
                       ),
                     ],
                   ],

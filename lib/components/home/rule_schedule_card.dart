@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/home/models/home_models.dart';
 
@@ -229,26 +227,11 @@ class RuleScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // Bottom Row: Overlapping App Badges / Native App Icons + Blocked Count
+            // Bottom Row: Overlapping App Badges + Blocked Count
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (Platform.isIOS &&
-                    rule.selectedAppIds.isEmpty &&
-                    rule.blockedCount > 0)
-                  const SizedBox(
-                    width: 82,
-                    height: 24,
-                    child: IgnorePointer(
-                      child: UiKitView(
-                        viewType: 'oruv/selected_apps_icons',
-                        creationParams: {'alignLeft': true},
-                        creationParamsCodec: StandardMessageCodec(),
-                      ),
-                    ),
-                  )
-                else
-                  _buildOverlappingBadges(badges),
+                _buildOverlappingBadges(badges),
                 Flexible(
                   child: Text(
                     '${rule.blockedCount} Blocked',

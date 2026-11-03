@@ -113,11 +113,11 @@ struct NativeSelectedAppsIconsView: View {
     let shownCount = displayedApps.count + displayedCats.count
     let extraCount = max(0, totalCount - shownCount)
 
-    HStack(spacing: -5) {
+    HStack(alignment: .center, spacing: -5) {
       ForEach(displayedApps, id: \.self) { token in
         Label(token)
           .labelStyle(.iconOnly)
-          .frame(width: 24, height: 24)
+          .frame(width: 24, height: 24, alignment: .center)
           .background(Color.white)
           .clipShape(Circle())
           .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
@@ -125,7 +125,7 @@ struct NativeSelectedAppsIconsView: View {
       ForEach(displayedCats, id: \.self) { token in
         Label(token)
           .labelStyle(.iconOnly)
-          .frame(width: 24, height: 24)
+          .frame(width: 24, height: 24, alignment: .center)
           .background(Color(red: 0.95, green: 0.95, blue: 0.96))
           .clipShape(Circle())
           .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
@@ -134,7 +134,7 @@ struct NativeSelectedAppsIconsView: View {
         Text("+\(extraCount)")
           .font(.system(size: 9.5, weight: .bold))
           .foregroundColor(Color(red: 0.12, green: 0.10, blue: 0.11))
-          .frame(minWidth: 24, minHeight: 24)
+          .frame(minWidth: 24, minHeight: 24, alignment: .center)
           .padding(.horizontal, 4)
           .background(Color(red: 0.93, green: 0.91, blue: 0.90))
           .clipShape(Capsule())
@@ -143,6 +143,7 @@ struct NativeSelectedAppsIconsView: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignLeft ? .leading : .trailing)
     .background(Color.white)
+    .ignoresSafeArea(.all)
   }
 }
 
@@ -186,6 +187,7 @@ class SelectedAppsIconsPlatformView: NSObject, FlutterPlatformView {
   init(frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) {
     self.containerView = UIView(frame: frame)
     self.containerView.backgroundColor = .white
+    self.containerView.clipsToBounds = true
     super.init()
 
     #if canImport(FamilyControls)
@@ -194,7 +196,12 @@ class SelectedAppsIconsPlatformView: NSObject, FlutterPlatformView {
       let alignLeft = (params?["alignLeft"] as? Bool) ?? false
       let swiftUIView = NativeSelectedAppsIconsView(alignLeft: alignLeft)
       let hosting = UIHostingController(rootView: swiftUIView)
+      if #available(iOS 16.4, *) {
+        hosting.safeAreaRegions = []
+      }
       hosting.view.backgroundColor = .white
+      hosting.view.clipsToBounds = true
+      hosting.view.insetsLayoutMarginsFromSafeArea = false
       hosting.view.translatesAutoresizingMaskIntoConstraints = false
       self.containerView.addSubview(hosting.view)
 

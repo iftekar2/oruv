@@ -28,6 +28,7 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
   late String _enforcementMode;
   late Set<String> _activeDays;
   late int _extraBlockedCount;
+  bool _isPickerOpen = false;
 
   final List<String> _dayKeys = ['M', 'T', 'W', 'T2', 'F', 'S', 'S2'];
   final List<String> _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -116,8 +117,12 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
     }
   }
 
-  void _openNativeScreenTimePicker() {
-    showModalBottomSheet(
+  Future<void> _openNativeScreenTimePicker() async {
+    setState(() {
+      _isPickerOpen = true;
+    });
+
+    await showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1C1C1E),
       isScrollControlled: true,
@@ -158,13 +163,6 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
                       TextButton(
                         onPressed: () {
                           Navigator.pop(ctx);
-                          if (mounted) {
-                            setState(() {
-                              _extraBlockedCount = OnboardingData
-                                  .instance
-                                  .totalSelectedAppsCount;
-                            });
-                          }
                         },
                         child: Text(
                           'Done',
@@ -201,6 +199,13 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
         );
       },
     );
+
+    if (mounted) {
+      setState(() {
+        _isPickerOpen = false;
+        _extraBlockedCount = OnboardingData.instance.totalSelectedAppsCount;
+      });
+    }
   }
 
   void _handleSave() {
@@ -308,143 +313,158 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
 
             // Scrollable Form Body
             Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 1. Prominent Choose from All iPhone Apps & Categories Card
-                    Text(
-                      'SHIELDED APPS',
-                      style: GoogleFonts.inter(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: _mutedText,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: _openNativeScreenTimePicker,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: _cardBorder),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
+              child: ClipRect(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. Prominent Choose from All iPhone Apps & Categories Card
+                      Text(
+                        'SHIELDED APPS',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: _mutedText,
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF3EFEA),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(
-                                    Icons.apps_rounded,
-                                    size: 22,
-                                    color: _primaryText,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Choose from All iPhone Apps & Categories',
-                                        style: GoogleFonts.lora(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          height: 1.25,
-                                          color: _primaryText,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _extraBlockedCount > 0
-                                            ? 'Tap to add or remove blocked apps'
-                                            : 'Tap to select apps & websites to block',
-                                        style: GoogleFonts.lora(
-                                          fontSize: 12,
-                                          color: _mutedText,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 22,
-                                  color: _mutedText,
-                                ),
-                              ],
-                            ),
-                            if (_extraBlockedCount > 0) ...[
-                              const SizedBox(height: 14),
-                              const Divider(
-                                color: Color(0xFFF2EEEA),
-                                height: 1,
-                                thickness: 1,
+                      ),
+
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: _openNativeScreenTimePicker,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          clipBehavior: Clip.hardEdge,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: _cardBorder),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
                               ),
-                              const SizedBox(height: 12),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Row(
                                 children: [
                                   Container(
-                                    width: 7,
-                                    height: 7,
-                                    decoration: const BoxDecoration(
-                                      color: _accentGreen,
-                                      shape: BoxShape.circle,
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF3EFEA),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
+                                      Icons.apps_rounded,
+                                      size: 22,
+                                      color: _primaryText,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Choose from All iPhone Apps & Categories',
+                                          style: GoogleFonts.lora(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            height: 1.25,
+                                            color: _primaryText,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _extraBlockedCount > 0
+                                              ? 'Tap to add or remove blocked apps'
+                                              : 'Tap to select apps & websites to block',
+                                          style: GoogleFonts.lora(
+                                            fontSize: 12,
+                                            color: _mutedText,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      '$_extraBlockedCount ${_extraBlockedCount == 1 ? 'App' : 'Apps'} chosen to block',
-                                      style: GoogleFonts.lora(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: _primaryText,
-                                      ),
-                                    ),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 22,
+                                    color: _mutedText,
                                   ),
-                                  if (Platform.isIOS)
-                                    SizedBox(
-                                      width: 110,
-                                      height: 28,
-                                      child: IgnorePointer(
-                                        child: UiKitView(
-                                          key: ValueKey<int>(_extraBlockedCount),
-                                          viewType: 'oruv/selected_apps_icons',
-                                          creationParamsCodec:
-                                              const StandardMessageCodec(),
-                                        ),
-                                      ),
-                                    ),
                                 ],
                               ),
+                              if (_extraBlockedCount > 0) ...[
+                                const SizedBox(height: 14),
+                                const Divider(
+                                  color: Color(0xFFF2EEEA),
+                                  height: 1,
+                                  thickness: 1,
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  height: 28,
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: 7,
+                                        height: 7,
+                                        decoration: const BoxDecoration(
+                                          color: _accentGreen,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '$_extraBlockedCount ${_extraBlockedCount == 1 ? 'App' : 'Apps'} chosen to block',
+                                          style: GoogleFonts.lora(
+                                            fontSize: 13,
+                                            height: 1.1,
+                                            fontWeight: FontWeight.w600,
+                                            color: _primaryText,
+                                          ),
+                                        ),
+                                      ),
+                                      if (Platform.isIOS && !_isPickerOpen)
+                                        ClipRect(
+                                          child: SizedBox(
+                                            width: 110,
+                                            height: 28,
+                                            child: IgnorePointer(
+                                              child: UiKitView(
+                                                key: ValueKey<int>(
+                                                  _extraBlockedCount,
+                                                ),
+                                                viewType:
+                                                    'oruv/selected_apps_icons',
+                                                creationParamsCodec:
+                                                    const StandardMessageCodec(),
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      else if (Platform.isIOS)
+                                        const SizedBox(width: 110, height: 28),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
-                    ),
 
                     const SizedBox(height: 22),
 
@@ -803,6 +823,7 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
                   ],
                 ),
               ),
+            ),
             ),
           ],
         ),
