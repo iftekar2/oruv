@@ -5,10 +5,7 @@ import 'package:oruv/components/signout.dart';
 class HomeTopAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onProfileTap;
 
-  const HomeTopAppBar({
-    super.key,
-    this.onProfileTap,
-  });
+  const HomeTopAppBar({super.key, this.onProfileTap});
 
   static const Color _primaryText = Color(0xFF1B1B1D);
   static const Color _cardBorder = Color(0xFFECE8E4);
@@ -27,11 +24,7 @@ class HomeTopAppBar extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: 18,
       title: Row(
         children: [
-          Image.asset(
-            'lib/components/images/logo.png',
-            width: 44,
-            height: 44,
-          ),
+          Image.asset('lib/components/images/logo.png', width: 44, height: 44),
           const SizedBox(width: 6),
           Text(
             'Oruv',
@@ -41,9 +34,11 @@ class HomeTopAppBar extends StatelessWidget implements PreferredSizeWidget {
               color: _primaryText,
             ),
           ),
+
           const Spacer(),
           IconButton(
-            onPressed: onProfileTap ??
+            onPressed:
+                onProfileTap ??
                 () {
                   Navigator.push(
                     context,
@@ -53,17 +48,14 @@ class HomeTopAppBar extends StatelessWidget implements PreferredSizeWidget {
             icon: const Icon(
               Icons.person_outline_rounded,
               color: _primaryText,
-              size: 22,
+              size: 25,
             ),
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
               padding: const EdgeInsets.all(10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(50),
-                side: const BorderSide(
-                  color: _cardBorder,
-                  width: 1.2,
-                ),
+                side: const BorderSide(color: _cardBorder, width: 1.2),
               ),
             ),
           ),
@@ -72,4 +64,3 @@ class HomeTopAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 }
-

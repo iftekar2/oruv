@@ -23,11 +23,13 @@ class HomeBottomNavBar extends StatelessWidget {
         icon: Icons.home_outlined,
         activeIcon: Icons.home_rounded,
       ),
+
       const _NavBarItemData(
         label: 'Shields',
         icon: Icons.shield_outlined,
         activeIcon: Icons.shield_rounded,
       ),
+
       const _NavBarItemData(
         label: 'Insights',
         icon: Icons.bar_chart_rounded,
@@ -38,14 +40,9 @@ class HomeBottomNavBar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: const Border(
-          top: BorderSide(
-            color: Color(0xFFEEEAE6),
-            width: 1,
-          ),
+          top: BorderSide(color: Color(0xFFEEEAE6), width: 1),
         ),
         boxShadow: [
           BoxShadow(
@@ -74,19 +71,22 @@ class HomeBottomNavBar extends StatelessWidget {
                     children: [
                       Icon(
                         isSelected ? item.activeIcon : item.icon,
-                        size: 23,
+                        size: 30,
                         color: isSelected ? _activeColor : _inactiveIconColor,
                       ),
+
                       const SizedBox(height: 4),
                       Text(
                         item.label,
                         style: GoogleFonts.lora(
-                          fontSize: 11,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                          fontSize: 15,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                           color: isSelected ? _activeColor : _inactiveTextColor,
                         ),
                       ),
+
                       const SizedBox(height: 5),
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 220),
@@ -123,4 +123,3 @@ class _NavBarItemData {
     required this.activeIcon,
   });
 }
-
