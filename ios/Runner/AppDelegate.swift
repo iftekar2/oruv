@@ -11,13 +11,18 @@ import ManagedSettings
 class ScreenTimeManager: ObservableObject {
   static let shared = ScreenTimeManager()
   private let storageKey = "oruv_family_activity_selection"
+  private let store = ManagedSettingsStore()
 
   var methodChannel: FlutterMethodChannel?
+  var isShieldActive: Bool = true
 
   @Published var activitySelection = FamilyActivitySelection() {
     didSet {
       saveSelection()
       notifyFlutter()
+      if isShieldActive {
+        applyShield()
+      }
     }
   }
 
@@ -51,7 +56,7 @@ class ScreenTimeManager: ObservableObject {
   }
 
   func applyShield() {
-    let store = ManagedSettingsStore()
+    isShieldActive = true
     store.shield.applications = activitySelection.applicationTokens.isEmpty
       ? nil
       : activitySelection.applicationTokens
@@ -61,6 +66,21 @@ class ScreenTimeManager: ObservableObject {
     store.shield.webDomains = activitySelection.webDomainTokens.isEmpty
       ? nil
       : activitySelection.webDomainTokens
+  }
+
+  func clearShield() {
+    isShieldActive = false
+    store.shield.applications = nil
+    store.shield.applicationCategories = nil
+    store.shield.webDomains = nil
+  }
+
+  func syncShield(shouldBlock: Bool) {
+    if shouldBlock {
+      applyShield()
+    } else {
+      clearShield()
+    }
   }
 }
 
@@ -299,6 +319,14 @@ class SelectedAppsIconsFactory: NSObject, FlutterPlatformViewFactory {
             ])
           case "applyShield":
             ScreenTimeManager.shared.applyShield()
+            result(true)
+          case "clearShield":
+            ScreenTimeManager.shared.clearShield()
+            result(true)
+          case "syncShield":
+            let args = call.arguments as? [String: Any]
+            let shouldBlock = (args?["shouldBlock"] as? Bool) ?? true
+            ScreenTimeManager.shared.syncShield(shouldBlock: shouldBlock)
             result(true)
           default:
             result(FlutterMethodNotImplemented)

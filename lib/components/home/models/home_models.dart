@@ -128,27 +128,125 @@ class ScheduleRuleModel {
 
   int get blockedCount => selectedAppIds.length + extraBlockedCount;
 
-  /// Returns true only if this rule is toggled on (`isActive`) AND the current
-  /// local time falls within [startTime] and [endTime].
+  static String weekdayKeyForDate(DateTime date) {
+    switch (date.weekday) {
+      case DateTime.monday:
+        return 'M';
+      case DateTime.tuesday:
+        return 'T';
+      case DateTime.wednesday:
+        return 'W';
+      case DateTime.thursday:
+        return 'T2';
+      case DateTime.friday:
+        return 'F';
+      case DateTime.saturday:
+        return 'S';
+      case DateTime.sunday:
+        return 'S2';
+      default:
+        return 'M';
+    }
+  }
+
+  bool isScheduledForDay(DateTime date) {
+    if (activeDays.isEmpty) return true;
+    return activeDays.contains(weekdayKeyForDate(date));
+  }
+
+  /// Returns true only if this rule is toggled on (`isActive`), scheduled for
+  /// today, AND the current local time falls within [startTime] and [endTime].
   bool get isCurrentlyRunning {
     if (!isActive) return false;
+    final now = DateTime.now();
+    if (!isScheduledForDay(now)) return false;
 
-    final startMins = _parseMinutesFromMidnight(startTime);
-    final endMins = _parseMinutesFromMidnight(endTime);
+    final startMins = parseMinutesFromMidnight(startTime);
+    final endMins = parseMinutesFromMidnight(endTime);
     if (startMins == null || endMins == null) return false;
+
+    final nowMins = now.hour * 60 + now.minute;
+
+    if (startMins <= endMins) {
+      return nowMins >= startMins && nowMins < endMins;
+    } else {
+      // Overnight schedule (e.g. 9:30 PM - 7:00 AM)
+      return nowMins >= startMins || nowMins < endMins;
+    }
+  }
+
+  /// Total duration of this schedule in minutes.
+  int get totalDurationMinutes {
+    final startMins = parseMinutesFromMidnight(startTime);
+    final endMins = parseMinutesFromMidnight(endTime);
+    if (startMins == null || endMins == null) return 0;
+
+    if (startMins <= endMins) {
+      return (endMins - startMins).clamp(1, 1440);
+    } else {
+      return ((1440 - startMins) + endMins).clamp(1, 1440);
+    }
+  }
+
+  /// Elapsed minutes in the current cycle if currently running.
+  int get currentCycleElapsedMinutes {
+    if (!isCurrentlyRunning) return 0;
+    final startMins = parseMinutesFromMidnight(startTime);
+    if (startMins == null) return 0;
 
     final now = DateTime.now();
     final nowMins = now.hour * 60 + now.minute;
 
-    if (startMins <= endMins) {
-      return nowMins >= startMins && nowMins <= endMins;
+    if (nowMins >= startMins) {
+      return nowMins - startMins;
     } else {
-      // Overnight schedule (e.g. 9:30 PM - 7:00 AM)
-      return nowMins >= startMins || nowMins <= endMins;
+      return (1440 - startMins) + nowMins;
     }
   }
 
-  static int? _parseMinutesFromMidnight(String formatted) {
+  /// Remaining minutes in the current cycle if currently running.
+  int get currentCycleRemainingMinutes {
+    if (!isCurrentlyRunning) return 0;
+    return (totalDurationMinutes - currentCycleElapsedMinutes)
+        .clamp(0, totalDurationMinutes);
+  }
+
+  /// Progress (0.0 to 1.0) of the current cycle.
+  double get currentCycleProgress {
+    if (!isCurrentlyRunning) return 0.0;
+    final total = totalDurationMinutes;
+    if (total <= 0) return 0.0;
+    return (currentCycleElapsedMinutes / total).clamp(0.0, 1.0);
+  }
+
+  /// Total minutes focused today from this schedule (whether currently in-progress or completed earlier today).
+  int get focusedMinutesToday {
+    if (!isActive) return 0;
+    final now = DateTime.now();
+    if (!isScheduledForDay(now)) return 0;
+
+    final startMins = parseMinutesFromMidnight(startTime);
+    final endMins = parseMinutesFromMidnight(endTime);
+    if (startMins == null || endMins == null) return 0;
+
+    final nowMins = now.hour * 60 + now.minute;
+
+    if (startMins <= endMins) {
+      if (nowMins < startMins) return 0;
+      if (nowMins >= endMins) return endMins - startMins;
+      return nowMins - startMins;
+    } else {
+      // Overnight schedule: count minutes elapsed today (before endMins in morning + after startMins at night)
+      int totalToday = 0;
+      totalToday += nowMins < endMins ? nowMins : endMins;
+      if (nowMins > startMins) {
+        totalToday += nowMins - startMins;
+      }
+      return totalToday;
+    }
+  }
+
+  static int? parseMinutesFromMidnight(String formatted) {
     try {
       final clean = formatted.trim().toUpperCase();
       final isPM = clean.contains('PM');
@@ -167,6 +265,19 @@ class ScheduleRuleModel {
       }
     } catch (_) {}
     return null;
+  }
+
+  static String formatDurationMinutes(int totalMinutes) {
+    if (totalMinutes <= 0) return '0m';
+    final hours = totalMinutes ~/ 60;
+    final mins = totalMinutes % 60;
+    if (hours > 0 && mins > 0) {
+      return '${hours}h ${mins}m';
+    } else if (hours > 0) {
+      return '${hours}h';
+    } else {
+      return '${mins}m';
+    }
   }
 
   List<AppBadgeInfo> get badges {
@@ -193,6 +304,62 @@ class ScheduleRuleModel {
     return shown;
   }
 
+  Map<String, dynamic> toSupabaseMap(String userId) {
+    return {
+      'id': id,
+      'user_id': userId,
+      'title': title,
+      'start_time': startTime,
+      'end_time': endTime,
+      'active_days': activeDays.toList(),
+      'enforcement_mode': enforcementMode,
+      'is_active': isActive,
+      'selected_app_ids': selectedAppIds.toList(),
+      'extra_blocked_count': extraBlockedCount,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> toJsonMap() {
+    return {
+      'id': id,
+      'title': title,
+      'start_time': startTime,
+      'end_time': endTime,
+      'active_days': activeDays.toList(),
+      'enforcement_mode': enforcementMode,
+      'is_active': isActive,
+      'selected_app_ids': selectedAppIds.toList(),
+      'extra_blocked_count': extraBlockedCount,
+    };
+  }
+
+  factory ScheduleRuleModel.fromMap(Map<String, dynamic> map) {
+    final rawDays = map['active_days'];
+    final Set<String> parsedDays = rawDays is List
+        ? rawDays.map((e) => e.toString()).toSet()
+        : {'M', 'T', 'W', 'T2', 'F'};
+
+    final rawApps = map['selected_app_ids'];
+    final Set<String> parsedApps = rawApps is List
+        ? rawApps.map((e) => e.toString()).toSet()
+        : {'instagram', 'x', 'youtube'};
+
+    return ScheduleRuleModel(
+      id: (map['id'] ?? 'rule_${DateTime.now().millisecondsSinceEpoch}')
+          .toString(),
+      title: (map['title'] ?? 'Focus Schedule').toString(),
+      startTime: (map['start_time'] ?? '9:00 AM').toString(),
+      endTime: (map['end_time'] ?? '5:00 PM').toString(),
+      enforcementMode:
+          (map['enforcement_mode'] ?? 'Strict enforcement mode').toString(),
+      isActive: map['is_active'] != false,
+      activeDays: parsedDays,
+      selectedAppIds: parsedApps,
+      extraBlockedCount: (map['extra_blocked_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+
   ScheduleRuleModel copyWith({
     String? id,
     String? title,
@@ -216,4 +383,34 @@ class ScheduleRuleModel {
       extraBlockedCount: extraBlockedCount ?? this.extraBlockedCount,
     );
   }
+}
+
+class LiveAnchorSnapshot {
+  final ScheduleRuleModel? activeRule;
+  final ScheduleRuleModel? nextRule;
+  final String shieldLabel;
+  final String title;
+  final String scheduleStart;
+  final String scheduleEnd;
+  final String remainingCycleText;
+  final double progress;
+  final String focusedDuration;
+  final int focusedMinutes;
+  final int pickupsSaved;
+  final int focusScore;
+
+  const LiveAnchorSnapshot({
+    this.activeRule,
+    this.nextRule,
+    required this.shieldLabel,
+    required this.title,
+    required this.scheduleStart,
+    required this.scheduleEnd,
+    required this.remainingCycleText,
+    required this.progress,
+    required this.focusedDuration,
+    required this.focusedMinutes,
+    required this.pickupsSaved,
+    required this.focusScore,
+  });
 }
