@@ -98,6 +98,7 @@ struct NativeFamilyActivityPickerView: View {
 @available(iOS 16.0, *)
 struct NativeSelectedAppsIconsView: View {
   @ObservedObject var manager = ScreenTimeManager.shared
+  var alignLeft: Bool = false
 
   var body: some View {
     let appTokens = Array(manager.activitySelection.applicationTokens)
@@ -116,7 +117,7 @@ struct NativeSelectedAppsIconsView: View {
       ForEach(displayedApps, id: \.self) { token in
         Label(token)
           .labelStyle(.iconOnly)
-          .frame(width: 26, height: 26)
+          .frame(width: 24, height: 24)
           .background(Color.white)
           .clipShape(Circle())
           .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
@@ -124,23 +125,23 @@ struct NativeSelectedAppsIconsView: View {
       ForEach(displayedCats, id: \.self) { token in
         Label(token)
           .labelStyle(.iconOnly)
-          .frame(width: 26, height: 26)
+          .frame(width: 24, height: 24)
           .background(Color(red: 0.95, green: 0.95, blue: 0.96))
           .clipShape(Circle())
           .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
       }
       if extraCount > 0 {
         Text("+\(extraCount)")
-          .font(.system(size: 10, weight: .bold))
-          .foregroundColor(.white)
-          .frame(minWidth: 26, minHeight: 26)
-          .padding(.horizontal, 5)
-          .background(Color(red: 0.16, green: 0.12, blue: 0.14))
+          .font(.system(size: 9.5, weight: .bold))
+          .foregroundColor(Color(red: 0.12, green: 0.10, blue: 0.11))
+          .frame(minWidth: 24, minHeight: 24)
+          .padding(.horizontal, 4)
+          .background(Color(red: 0.93, green: 0.91, blue: 0.90))
           .clipShape(Capsule())
           .overlay(Capsule().stroke(Color.white, lineWidth: 1.5))
       }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignLeft ? .leading : .trailing)
     .background(Color.white)
   }
 }
@@ -189,7 +190,9 @@ class SelectedAppsIconsPlatformView: NSObject, FlutterPlatformView {
 
     #if canImport(FamilyControls)
     if #available(iOS 16.0, *) {
-      let swiftUIView = NativeSelectedAppsIconsView()
+      let params = args as? [String: Any]
+      let alignLeft = (params?["alignLeft"] as? Bool) ?? false
+      let swiftUIView = NativeSelectedAppsIconsView(alignLeft: alignLeft)
       let hosting = UIHostingController(rootView: swiftUIView)
       hosting.view.backgroundColor = .white
       hosting.view.translatesAutoresizingMaskIntoConstraints = false

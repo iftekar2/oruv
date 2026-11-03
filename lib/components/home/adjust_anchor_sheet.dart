@@ -287,42 +287,99 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: _cardBorder),
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    const Icon(
-                      Icons.apps_rounded,
-                      size: 20,
-                      color: _accentGreen,
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3EFEA),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.apps_rounded,
+                            size: 20,
+                            color: _primaryText,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Choose from All iPhone Apps & Categories',
+                                style: GoogleFonts.lora(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: _primaryText,
+                                ),
+                              ),
+                              Text(
+                                selectedCount > 0
+                                    ? 'Tap to add or remove blocked apps'
+                                    : 'Tap to lock or unblock apps',
+                                style: GoogleFonts.lora(
+                                  fontSize: 11.5,
+                                  color: _mutedText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: _mutedText,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    if (selectedCount > 0) ...[
+                      const SizedBox(height: 12),
+                      const Divider(
+                        color: Color(0xFFF2EEEA),
+                        height: 1,
+                        thickness: 1,
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
                         children: [
-                          Text(
-                            'Locked & Unblocked Apps',
-                            style: GoogleFonts.lora(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: _primaryText,
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: _accentGreen,
+                              shape: BoxShape.circle,
                             ),
                           ),
-                          Text(
-                            selectedCount > 0
-                                ? '$selectedCount apps currently shielded'
-                                : 'Tap to lock or unblock apps',
-                            style: GoogleFonts.lora(
-                              fontSize: 11.5,
-                              color: _mutedText,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$selectedCount ${selectedCount == 1 ? 'App' : 'Apps'} chosen to block',
+                              style: GoogleFonts.lora(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
                             ),
                           ),
+                          if (Platform.isIOS)
+                            SizedBox(
+                              width: 110,
+                              height: 28,
+                              child: IgnorePointer(
+                                child: UiKitView(
+                                  key: ValueKey<int>(selectedCount),
+                                  viewType: 'oruv/selected_apps_icons',
+                                  creationParamsCodec:
+                                      const StandardMessageCodec(),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: _mutedText,
-                    ),
+                    ],
                   ],
                 ),
               ),
