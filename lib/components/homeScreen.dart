@@ -343,9 +343,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
           const SizedBox(height: 26),
 
-          // Feature 2: Rules & Schedules Section (Horizontal Row)
+          // Feature 2: Rules & Schedules Section (Horizontal Row in Escalator Order)
           RulesSchedulesSection(
-            rules: _rules,
+            rules: ScheduleService.sortRulesForHomeEscalator(_rules),
             onRuleToggled: _handleRuleToggled,
             onRuleTap: _openEditRuleSheet,
             onViewAll: _handleViewAllRules,
