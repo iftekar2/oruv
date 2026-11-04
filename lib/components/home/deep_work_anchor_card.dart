@@ -13,6 +13,8 @@ class DeepWorkAnchorCard extends StatelessWidget {
   final int pickupsSaved;
   final int focusScore;
   final bool isOnBreak;
+  final int breakRemainingSeconds;
+  final int breakTotalSeconds;
   final VoidCallback onTakeMindfulBreak;
   final VoidCallback onAdjust;
 
@@ -28,6 +30,8 @@ class DeepWorkAnchorCard extends StatelessWidget {
     this.pickupsSaved = 18,
     this.focusScore = 88,
     this.isOnBreak = false,
+    this.breakRemainingSeconds = 0,
+    this.breakTotalSeconds = 0,
     required this.onTakeMindfulBreak,
     required this.onAdjust,
   });
@@ -38,9 +42,17 @@ class DeepWorkAnchorCard extends StatelessWidget {
   static const Color _cardBorder = Color(0xFFECE8E4);
   static const Color _darkNavyButton = Color(0xFF131B26);
 
+  String _formatSeconds(int totalSeconds) {
+    if (totalSeconds <= 0) return '0:00';
+    final m = totalSeconds ~/ 60;
+    final s = totalSeconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final percentValue = (progress * 100).round();
+    final remainingText = _formatSeconds(breakRemainingSeconds);
 
     return Container(
       width: double.infinity,
@@ -113,7 +125,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              // 72% Progress Ring
+              // Progress Ring
               SizedBox(
                 width: 62,
                 height: 62,
@@ -245,14 +257,16 @@ class DeepWorkAnchorCard extends StatelessWidget {
                 children: [
                   Icon(
                     isOnBreak
-                        ? Icons.play_circle_outline_rounded
+                        ? Icons.play_arrow_rounded
                         : Icons.self_improvement_rounded,
-                    size: 20,
+                    size: 22,
                     color: Colors.white,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isOnBreak ? 'Resume Deep Work' : 'Take Mindful Break',
+                    isOnBreak
+                        ? 'Resume Focus ($remainingText)'
+                        : 'Take Mindful Break',
                     style: GoogleFonts.lora(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w700,

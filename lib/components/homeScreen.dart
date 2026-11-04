@@ -25,6 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isOnMindfulBreak = false;
   int _mindfulBreakRemainingSeconds = 0;
+  int _mindfulBreakTotalSeconds = 0;
+  DateTime? _breakEndTime;
   int _mindfulBreakMinutesToday = 0;
 
   Timer? _liveClockTimer;
@@ -97,8 +99,20 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _isOnMindfulBreak = false;
         _mindfulBreakRemainingSeconds = 0;
+        _mindfulBreakTotalSeconds = 0;
+        _breakEndTime = null;
       });
       _syncShieldAndStats();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Mindful break ended \u2013 Focus mode and shields resumed.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Color(0xFF1D6F58),
+          duration: Duration(seconds: 3),
+        ),
+      );
       return;
     }
 
@@ -109,9 +123,15 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (_) => MindfulBreakSheet(
         onStartBreakMinutes: (minutes) {
           _mindfulBreakTimer?.cancel();
+          final totalSec = minutes * 60;
+          final targetEndTime =
+              DateTime.now().add(Duration(seconds: totalSec));
+
           setState(() {
             _isOnMindfulBreak = true;
-            _mindfulBreakRemainingSeconds = minutes * 60;
+            _mindfulBreakTotalSeconds = totalSec;
+            _mindfulBreakRemainingSeconds = totalSec;
+            _breakEndTime = targetEndTime;
             _mindfulBreakMinutesToday += minutes;
           });
           _syncShieldAndStats();
@@ -123,16 +143,35 @@ class _HomeScreenState extends State<HomeScreen> {
                 timer.cancel();
                 return;
               }
-              if (_mindfulBreakRemainingSeconds <= 1) {
+              final now = DateTime.now();
+              final remaining = _breakEndTime != null
+                  ? _breakEndTime!.difference(now).inSeconds
+                  : _mindfulBreakRemainingSeconds - 1;
+
+              if (remaining <= 0) {
                 timer.cancel();
                 setState(() {
                   _isOnMindfulBreak = false;
                   _mindfulBreakRemainingSeconds = 0;
+                  _mindfulBreakTotalSeconds = 0;
+                  _breakEndTime = null;
                 });
                 _syncShieldAndStats();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mindful break ended \u2013 Focus mode and shields automatically restarted!',
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: Color(0xFF1D6F58),
+                      duration: Duration(seconds: 4),
+                    ),
+                  );
+                }
               } else {
                 setState(() {
-                  _mindfulBreakRemainingSeconds--;
+                  _mindfulBreakRemainingSeconds = remaining;
                 });
               }
             },
@@ -141,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Mindful break started for $minutes minutes \u2013 apps unlocked.',
+                'Mindful break started for $minutes minutes',
               ),
               behavior: SnackBarBehavior.floating,
               backgroundColor: const Color(0xFF1D6F58),
@@ -337,6 +376,8 @@ class _HomeScreenState extends State<HomeScreen> {
             pickupsSaved: snapshot.pickupsSaved,
             focusScore: snapshot.focusScore,
             isOnBreak: _isOnMindfulBreak,
+            breakRemainingSeconds: _mindfulBreakRemainingSeconds,
+            breakTotalSeconds: _mindfulBreakTotalSeconds,
             onTakeMindfulBreak: _handleTakeMindfulBreak,
             onAdjust: () => _handleAdjustAnchor(snapshot),
           ),

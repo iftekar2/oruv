@@ -87,13 +87,26 @@ class _MindfulBreakSheetState extends State<MindfulBreakSheet> {
               ],
             ),
             const SizedBox(height: 22),
-            Text(
-              'Select Duration',
-              style: GoogleFonts.lora(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: _primaryText,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Select Duration',
+                  style: GoogleFonts.lora(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: _primaryText,
+                  ),
+                ),
+                Text(
+                  '-$_selectedMinutes Focus Score',
+                  style: GoogleFonts.lora(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFD97706),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Row(
