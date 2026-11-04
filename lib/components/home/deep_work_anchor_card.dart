@@ -10,7 +10,6 @@ class DeepWorkAnchorCard extends StatelessWidget {
   final String remainingCycleText;
   final double progress;
   final String focusedDuration;
-  final int pickupsSaved;
   final int focusScore;
   final bool isOnBreak;
   final int breakRemainingSeconds;
@@ -27,7 +26,6 @@ class DeepWorkAnchorCard extends StatelessWidget {
     this.remainingCycleText = '3h 15m remaining in current cycle',
     this.progress = 0.72,
     this.focusedDuration = '1h 45m',
-    this.pickupsSaved = 18,
     this.focusScore = 88,
     this.isOnBreak = false,
     this.breakRemainingSeconds = 0,
@@ -199,25 +197,13 @@ class DeepWorkAnchorCard extends StatelessWidget {
           ),
           const SizedBox(height: 18),
 
-          // 3-Column Metrics Row
+          // 2-Column Metrics Row: Focused & Focus Score
           Row(
             children: [
               Expanded(
                 child: _buildMetricColumn(
                   value: focusedDuration,
                   label: 'Focused',
-                  valueColor: _primaryText,
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 36,
-                color: const Color(0xFFEEEAE6),
-              ),
-              Expanded(
-                child: _buildMetricColumn(
-                  value: '$pickupsSaved',
-                  label: 'Pickups Saved',
                   valueColor: _primaryText,
                 ),
               ),

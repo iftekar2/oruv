@@ -373,7 +373,6 @@ class _HomeScreenState extends State<HomeScreen> {
             remainingCycleText: snapshot.remainingCycleText,
             progress: snapshot.progress,
             focusedDuration: snapshot.focusedDuration,
-            pickupsSaved: snapshot.pickupsSaved,
             focusScore: snapshot.focusScore,
             isOnBreak: _isOnMindfulBreak,
             breakRemainingSeconds: _mindfulBreakRemainingSeconds,
@@ -420,7 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              '${snapshot.focusedDuration} focused today \u2022 ${snapshot.pickupsSaved} pickups saved \u2022 ${snapshot.focusScore} Focus Score',
+              '${snapshot.focusedDuration} focused today \u2022 ${snapshot.focusScore} Focus Score',
               textAlign: TextAlign.center,
               style: GoogleFonts.lora(
                 fontSize: 13.5,

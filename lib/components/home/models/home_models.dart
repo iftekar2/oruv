@@ -222,8 +222,8 @@ class ScheduleRuleModel {
   /// Total minutes focused today from this schedule (whether currently in-progress or completed earlier today).
   int get focusedMinutesToday {
     if (!isActive) return 0;
+    if (blockedCount <= 0) return 0;
     final now = DateTime.now();
-    if (!isScheduledForDay(now)) return 0;
 
     final startMins = parseMinutesFromMidnight(startTime);
     final endMins = parseMinutesFromMidnight(endTime);
@@ -232,17 +232,23 @@ class ScheduleRuleModel {
     final nowMins = now.hour * 60 + now.minute;
 
     if (startMins <= endMins) {
+      if (!isScheduledForDay(now)) return 0;
       if (nowMins < startMins) return 0;
       if (nowMins >= endMins) return endMins - startMins;
       return nowMins - startMins;
     } else {
-      // Overnight schedule: count minutes elapsed today (before endMins in morning + after startMins at night)
-      int totalToday = 0;
-      totalToday += nowMins < endMins ? nowMins : endMins;
-      if (nowMins > startMins) {
-        totalToday += nowMins - startMins;
+      // Overnight schedule (e.g. 8:00 PM - 7:00 AM)
+      int total = 0;
+      // Night portion (starts tonight at startMins):
+      if (isScheduledForDay(now) && nowMins > startMins) {
+        total += nowMins - startMins;
       }
-      return totalToday;
+      // Morning portion (started yesterday evening, runs up to endMins today):
+      final yesterday = now.subtract(const Duration(days: 1));
+      if (isScheduledForDay(yesterday)) {
+        total += nowMins < endMins ? nowMins : endMins;
+      }
+      return total;
     }
   }
 
@@ -416,7 +422,7 @@ class LiveAnchorSnapshot {
     required this.progress,
     required this.focusedDuration,
     required this.focusedMinutes,
-    required this.pickupsSaved,
+    this.pickupsSaved = 0,
     required this.focusScore,
   });
 }
