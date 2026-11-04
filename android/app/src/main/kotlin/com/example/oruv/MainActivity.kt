@@ -1,5 +1,3 @@
 package com.example.oruv
 
-import io.flutter.embedding.android.FlutterActivity
-
-class MainActivity : FlutterActivity()
+class MainActivity : app.iftekarhossain.oruv.MainActivity()

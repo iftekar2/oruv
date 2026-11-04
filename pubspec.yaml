@@ -78,6 +78,7 @@ flutter:
     - lib/icons/tik-tok.png
     - lib/icons/twitter.png
     - lib/icons/youtube.png
+    - lib/icons/edits.png
     - lib/components/images/welcome-image.jpg
     - lib/components/welcomePages/images/ob-block.jpg
     - lib/components/welcomePages/images/ob-schedule.jpg

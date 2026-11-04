@@ -13,6 +13,7 @@ import 'package:oruv/components/home/rules_schedules_section.dart';
 import 'package:oruv/components/home/shields_page.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/services/schedule_service.dart';
+import 'package:oruv/services/screen_time_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<ScheduleRuleModel> _rules = [];
   bool _isLoadingSchedules = true;
+  DailyScreenTimeSnapshot? _screenTimeSnapshot;
 
   @override
   void initState() {
@@ -55,19 +57,30 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) {
           setState(() {});
           _syncShieldAndStats();
+          _refreshDailyScreenTime();
         }
       },
     );
 
     final loadedRules = await ScheduleService.loadSchedules();
+    final screenTime = await ScreenTimeService.fetchDailyScreenTime();
     if (!mounted) return;
 
     setState(() {
       _rules = loadedRules;
+      _screenTimeSnapshot = screenTime;
       _isLoadingSchedules = false;
     });
 
     await _syncShieldAndStats();
+  }
+
+  Future<void> _refreshDailyScreenTime() async {
+    final screenTime = await ScreenTimeService.fetchDailyScreenTime();
+    if (!mounted) return;
+    setState(() {
+      _screenTimeSnapshot = screenTime;
+    });
   }
 
   Future<void> _syncShieldAndStats() async {
@@ -264,6 +277,7 @@ class _HomeScreenState extends State<HomeScreen> {
           });
           await ScheduleService.upsertSchedule(newRule, _rules);
           await _syncShieldAndStats();
+          await _refreshDailyScreenTime();
         },
       ),
     );
@@ -292,6 +306,7 @@ class _HomeScreenState extends State<HomeScreen> {
           });
           await ScheduleService.upsertSchedule(updatedRule, _rules);
           await _syncShieldAndStats();
+          await _refreshDailyScreenTime();
         },
         onDelete: () async {
           setState(() {
@@ -386,6 +401,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Feature 2: Daily Screen Time Card (Middle of screen, above Rules & Schedules)
           DailyScreenTimeCard(
+            totalMinutes: _screenTimeSnapshot?.totalMinutes,
+            apps: _screenTimeSnapshot?.apps,
             onTapHeader: () {
               setState(() {
                 _currentTabIndex = 2; // Navigate to Insights tab

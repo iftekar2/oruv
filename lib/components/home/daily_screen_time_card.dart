@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppScreenTimeItem {
@@ -6,6 +8,15 @@ class AppScreenTimeItem {
   final String name;
   final int durationMinutes;
   final Color barColor;
+
+  /// Raw PNG bytes extracted dynamically from the OS (e.g., Android PackageManager).
+  final Uint8List? iconBytes;
+
+  /// Native iOS FamilyControls token index (renders real iOS icon & title via Label(token)).
+  final int? iosTokenIndex;
+  final bool isIosCategory;
+
+  /// Optional custom widget icon override.
   final Widget? icon;
 
   const AppScreenTimeItem({
@@ -13,6 +24,9 @@ class AppScreenTimeItem {
     required this.name,
     required this.durationMinutes,
     required this.barColor,
+    this.iconBytes,
+    this.iosTokenIndex,
+    this.isIosCategory = false,
     this.icon,
   });
 
@@ -34,11 +48,16 @@ class DailyScreenTimeCard extends StatelessWidget {
   final List<AppScreenTimeItem>? apps;
   final VoidCallback? onTapHeader;
 
+  /// Set to true once the `ScreenTimeReportExtension` target is enabled in Xcode
+  /// to render Apple's system-wide `DeviceActivityReport` directly inside the card.
+  final bool useIosDeviceActivityReport;
+
   const DailyScreenTimeCard({
     super.key,
     this.totalMinutes,
     this.apps,
     this.onTapHeader,
+    this.useIosDeviceActivityReport = false,
   });
 
   static const Color _primaryText = Color(0xFF1B1B1D);
@@ -51,47 +70,49 @@ class DailyScreenTimeCard extends StatelessWidget {
   List<AppScreenTimeItem> get _effectiveApps {
     if (apps != null && apps!.isNotEmpty) return apps!;
     return [
-      AppScreenTimeItem(
+      const AppScreenTimeItem(
         id: 'instagram',
         name: 'Instagram',
         durationMinutes: 88, // 1h 28m
         barColor: _coralPink,
-        icon: _buildInstagramIcon(),
       ),
-      AppScreenTimeItem(
+      const AppScreenTimeItem(
         id: 'tiktok',
         name: 'TikTok',
         durationMinutes: 87, // 1h 27m
         barColor: _coralPink,
-        icon: _buildTikTokIcon(),
       ),
       AppScreenTimeItem(
         id: 'oruv',
         name: 'Oruv',
         durationMinutes: 65, // 1h 5m
         barColor: _emeraldGreen,
-        icon: _buildOruvIcon(),
+        icon: _buildAssetAppIcon(
+          'lib/components/images/logo.png',
+          isContain: true,
+        ),
       ),
-      AppScreenTimeItem(
+      const AppScreenTimeItem(
         id: 'youtube',
         name: 'YouTube',
         durationMinutes: 52, // 52m
         barColor: _coralPink,
-        icon: _buildYouTubeIcon(),
       ),
-      AppScreenTimeItem(
+      const AppScreenTimeItem(
         id: 'edits',
         name: 'Edits',
         durationMinutes: 14, // 14m
-        barColor: const Color(0xFF3BBA9C),
-        icon: _buildEditsIcon(),
+        barColor: Color(0xFF3BBA9C),
       ),
     ];
   }
 
   int get _effectiveTotalMinutes {
     if (totalMinutes != null && totalMinutes! > 0) return totalMinutes!;
-    return 395; // 6h 35m matching screenshot
+    if (apps != null && apps!.isNotEmpty) {
+      return apps!.fold<int>(0, (sum, item) => sum + item.durationMinutes);
+    }
+    return 395; // 6h 35m preview fallback
   }
 
   String get _formattedTotalDuration {
@@ -163,219 +184,242 @@ class DailyScreenTimeCard extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 6),
-
-          // Total duration headline: "6h 35m"
-          Text(
-            _formattedTotalDuration,
-            style: GoogleFonts.lora(
-              fontSize: 27,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.5,
-              color: _primaryText,
-              height: 1.15,
+          if (Platform.isIOS && useIosDeviceActivityReport) ...[
+            const SizedBox(height: 8),
+            const SizedBox(
+              height: 320,
+              child: UiKitView(
+                viewType: 'oruv/device_activity_report',
+                creationParamsCodec: StandardMessageCodec(),
+              ),
             ),
-          ),
+          ] else ...[
+            const SizedBox(height: 6),
 
-          const SizedBox(height: 3),
-
-          // Subtitle: "Today"
-          Text(
-            'Today',
-            style: GoogleFonts.inter(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w400,
-              color: _mutedText,
+            // Total duration headline: "6h 35m"
+            Text(
+              _formattedTotalDuration,
+              style: GoogleFonts.lora(
+                fontSize: 27,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                color: _primaryText,
+                height: 1.15,
+              ),
             ),
-          ),
 
-          const SizedBox(height: 16),
-          const Divider(
-            color: Color(0xFFF2EEEA),
-            height: 1,
-            thickness: 1,
-          ),
-          const SizedBox(height: 14),
+            const SizedBox(height: 3),
 
-          // List of apps with icons, names, horizontal bars, and times
-          Column(
-            children: appItems.map((item) {
-              final ratio = (item.durationMinutes / maxAppMinutes).clamp(0.08, 1.0);
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                child: Row(
-                  children: [
-                    // App Icon
-                    SizedBox(
-                      width: 34,
-                      height: 34,
-                      child: item.icon ?? _buildDefaultIcon(item.name),
-                    ),
-                    const SizedBox(width: 12),
+            // Subtitle: "Today"
+            Text(
+              'Today',
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w400,
+                color: _mutedText,
+              ),
+            ),
 
-                    // App Name + Progress Bar
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                item.name,
-                                style: GoogleFonts.lora(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: _primaryText,
-                                ),
-                              ),
-                              Text(
-                                item.formattedDuration,
-                                style: GoogleFonts.lora(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: item.barColor == _emeraldGreen
-                                      ? _emeraldGreen
-                                      : _primaryText,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 7),
-                          // Horizontal Bar matching screenshot layout
-                          Container(
-                            height: 4.5,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: _trackColor,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: ratio,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: item.barColor,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+            const SizedBox(height: 16),
+            const Divider(
+              color: Color(0xFFF2EEEA),
+              height: 1,
+              thickness: 1,
+            ),
+            const SizedBox(height: 14),
+
+            // List of apps with dynamic OS icons, names, horizontal bars, and times
+            Column(
+              children: appItems.map((item) {
+                final ratio =
+                    (item.durationMinutes / maxAppMinutes).clamp(0.08, 1.0);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  child: Row(
+                    children: [
+                      // Dynamic OS App Icon (iOS FamilyControls token, Android PackageManager bytes, or fallback)
+                      SizedBox(
+                        width: 34,
+                        height: 34,
+                        child: _buildItemIcon(item),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
+                      const SizedBox(width: 12),
+
+                      // App Name + Progress Bar
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: _buildItemTitle(item),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  item.formattedDuration,
+                                  style: GoogleFonts.lora(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: item.barColor == _emeraldGreen
+                                        ? _emeraldGreen
+                                        : _primaryText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 7),
+                            // Horizontal Bar matching screenshot layout
+                            Container(
+                              height: 4.5,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: _trackColor,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: ratio,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: item.barColor,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  // --- App Icons Styling ---
+  // --- Dynamic OS App Icon & Name Rendering ---
 
-  static Widget _buildInstagramIcon() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(9),
-        gradient: const RadialGradient(
-          center: Alignment(-0.8, 0.9),
-          radius: 1.2,
-          colors: [
-            Color(0xFFFFDC80),
-            Color(0xFFFD1D1D),
-            Color(0xFFC13584),
-            Color(0xFF833AB4),
-          ],
+  static Widget _buildItemIcon(AppScreenTimeItem item) {
+    // 1. Custom widget icon (e.g., Oruv logo)
+    if (item.icon != null) {
+      return item.icon!;
+    }
+
+    // 2. Native Android/OS icon bytes from PackageManager
+    if (item.iconBytes != null && item.iconBytes!.isNotEmpty) {
+      return _buildIconShell(
+        child: Image.memory(
+          item.iconBytes!,
+          width: 34,
+          height: 34,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => _buildDefaultIcon(item.name),
         ),
-      ),
-      alignment: Alignment.center,
-      child: Container(
-        width: 18,
-        height: 18,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(5.5),
-          border: Border.all(color: Colors.white, width: 1.8),
-        ),
-        alignment: Alignment.center,
-        child: Container(
-          width: 6.5,
-          height: 6.5,
-          decoration: const BoxDecoration(
-            color: Colors.transparent,
-            shape: BoxShape.circle,
-            border: Border.fromBorderSide(
-              BorderSide(color: Colors.white, width: 1.8),
+      );
+    }
+
+    // 3. Native iOS Screen Time token icon via FamilyControls Label(token)
+    if (Platform.isIOS && item.iosTokenIndex != null) {
+      return _buildIconShell(
+        child: IgnorePointer(
+          child: UiKitView(
+            key: ValueKey<String>(
+              'ios_icon_${item.isIosCategory}_${item.iosTokenIndex}',
             ),
+            viewType: 'oruv/app_token_icon',
+            creationParams: <String, dynamic>{
+              'index': item.iosTokenIndex,
+              'isCategory': item.isIosCategory,
+            },
+            creationParamsCodec: const StandardMessageCodec(),
           ),
         ),
-      ),
-    );
+      );
+    }
+
+    // 4. Clean monogram badge fallback for any unknown app
+    return _buildDefaultIcon(item.name);
   }
 
-  static Widget _buildTikTokIcon() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F0F10),
-        borderRadius: BorderRadius.circular(9),
-      ),
-      alignment: Alignment.center,
-      child: const Icon(
-        Icons.music_note_rounded,
-        color: Colors.white,
-        size: 20,
-      ),
-    );
-  }
-
-  static Widget _buildOruvIcon() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F5F2),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: const Color(0xFFECE8E4), width: 1),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: Image.asset(
-        'lib/components/images/logo.png',
-        fit: BoxFit.contain,
-      ),
-    );
-  }
-
-  static Widget _buildYouTubeIcon() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFF0000),
-        borderRadius: BorderRadius.circular(9),
-      ),
-      alignment: Alignment.center,
-      child: const Icon(
-        Icons.play_arrow_rounded,
-        color: Colors.white,
-        size: 20,
-      ),
-    );
-  }
-
-  static Widget _buildEditsIcon() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(9),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2C2A38), Color(0xFF17161F)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  static Widget _buildItemTitle(AppScreenTimeItem item) {
+    if (Platform.isIOS && item.iosTokenIndex != null) {
+      return SizedBox(
+        height: 19,
+        child: IgnorePointer(
+          child: UiKitView(
+            key: ValueKey<String>(
+              'ios_title_${item.isIosCategory}_${item.iosTokenIndex}',
+            ),
+            viewType: 'oruv/app_token_title',
+            creationParams: <String, dynamic>{
+              'index': item.iosTokenIndex,
+              'isCategory': item.isIosCategory,
+            },
+            creationParamsCodec: const StandardMessageCodec(),
+          ),
         ),
-        border: Border.all(color: const Color(0xFF3E3B4D), width: 1),
+      );
+    }
+
+    return Text(
+      item.name,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: GoogleFonts.lora(
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
+        color: _primaryText,
       ),
-      alignment: Alignment.center,
-      child: const Icon(
-        Icons.movie_creation_outlined,
-        color: Color(0xFF3BBA9C),
-        size: 18,
+    );
+  }
+
+  static Widget _buildIconShell({
+    required Widget child,
+    double padding = 0.0,
+  }) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8.5),
+        border: Border.all(
+          color: const Color(0xFFECE8E4),
+          width: 0.8,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 4,
+            offset: const Offset(0, 1.5),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(7.5),
+        child: Padding(
+          padding: EdgeInsets.all(padding),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildAssetAppIcon(String assetPath, {bool isContain = false}) {
+    return _buildIconShell(
+      padding: isContain ? 3.0 : 0.0,
+      child: Image.asset(
+        assetPath,
+        width: 34,
+        height: 34,
+        fit: isContain ? BoxFit.contain : BoxFit.cover,
       ),
     );
   }
@@ -384,7 +428,7 @@ class DailyScreenTimeCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFEEEBE7),
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(8.5),
       ),
       alignment: Alignment.center,
       child: Text(
@@ -398,4 +442,3 @@ class DailyScreenTimeCard extends StatelessWidget {
     );
   }
 }
-
