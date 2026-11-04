@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/home/adjust_anchor_sheet.dart';
+import 'package:oruv/components/home/daily_screen_time_card.dart';
 import 'package:oruv/components/home/deep_work_anchor_card.dart';
 import 'package:oruv/components/home/home_bottom_nav_bar.dart';
 import 'package:oruv/components/home/home_top_app_bar.dart';
@@ -381,9 +382,20 @@ class _HomeScreenState extends State<HomeScreen> {
             onAdjust: () => _handleAdjustAnchor(snapshot),
           ),
 
+          const SizedBox(height: 20),
+
+          // Feature 2: Daily Screen Time Card (Middle of screen, above Rules & Schedules)
+          DailyScreenTimeCard(
+            onTapHeader: () {
+              setState(() {
+                _currentTabIndex = 2; // Navigate to Insights tab
+              });
+            },
+          ),
+
           const SizedBox(height: 26),
 
-          // Feature 2: Rules & Schedules Section (Horizontal Row in Escalator Order)
+          // Feature 3: Rules & Schedules Section (Horizontal Row in Escalator Order)
           RulesSchedulesSection(
             rules: ScheduleService.sortRulesForHomeEscalator(_rules),
             onRuleToggled: _handleRuleToggled,
