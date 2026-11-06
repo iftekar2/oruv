@@ -448,12 +448,14 @@ class DeviceActivityReportPlatformView: NSObject, FlutterPlatformView {
     self.containerView = UIView(frame: frame)
     self.containerView.backgroundColor = .white
     self.containerView.clipsToBounds = true
+    self.containerView.isUserInteractionEnabled = false
     super.init()
 
     #if canImport(DeviceActivity)
     if #available(iOS 16.0, *) {
       let swiftUIView = NativeDeviceActivityReportContainerView()
       let hosting = UIHostingController(rootView: swiftUIView)
+      hosting.view.isUserInteractionEnabled = false
       if #available(iOS 16.4, *) {
         hosting.safeAreaRegions = []
       }

@@ -21,17 +21,17 @@ struct TotalActivityView: View {
             Text("Today")
                 .font(.system(size: 12.5, weight: .regular))
                 .foregroundColor(mutedText)
-                .padding(.top, 3)
+                .padding(.top, 2)
 
             Divider()
                 .background(Color(red: 0.949, green: 0.933, blue: 0.918))
-                .padding(.vertical, 14)
+                .padding(.vertical, 10)
 
             if configuration.apps.isEmpty {
                 Text("No app activity recorded yet today.")
                     .font(.system(size: 13, weight: .regular, design: .serif))
                     .foregroundColor(mutedText)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
             } else {
                 ForEach(configuration.apps) { item in
                     let ratio = min(1.0, max(0.08, Double(item.durationMinutes) / Double(maxMins)))
@@ -70,12 +70,12 @@ struct TotalActivityView: View {
                             .lineLimit(1)
                             .layoutPriority(1)
                     }
-                    .frame(height: 40)
-                    .padding(.vertical, 3)
+                    .frame(height: 38)
+                    .padding(.vertical, 2)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(Color.white)
     }
 }

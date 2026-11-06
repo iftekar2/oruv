@@ -31,13 +31,6 @@ class AppScreenTimeItem {
   }
 }
 
-/// Shows today's REAL screen time.
-///
-/// - iOS: embeds Apple's `DeviceActivityReport` (rendered by the
-///   `ScreenTimeReportExtension` target), which is the only way Apple allows
-///   apps to display real usage minutes + real app icons.
-/// - Android: renders data from `UsageStatsManager` + `PackageManager`.
-/// - No permission: shows a "Connect Screen Time" prompt (never fake data).
 class DailyScreenTimeCard extends StatelessWidget {
   final bool isAuthorized;
   final bool useNativeIosReport;
@@ -66,7 +59,7 @@ class DailyScreenTimeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
@@ -122,11 +115,13 @@ class DailyScreenTimeCard extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.only(top: 6),
       child: SizedBox(
-        // Total headline + "Today" + divider + up to 5 rows.
-        height: 360,
-        child: UiKitView(
-          viewType: 'oruv/device_activity_report',
-          creationParamsCodec: StandardMessageCodec(),
+        // Total headline + "Today" + divider + up to 5 tucked-in rows.
+        height: 276,
+        child: IgnorePointer(
+          child: UiKitView(
+            viewType: 'oruv/device_activity_report',
+            creationParamsCodec: StandardMessageCodec(),
+          ),
         ),
       ),
     );
@@ -134,7 +129,8 @@ class DailyScreenTimeCard extends StatelessWidget {
 
   /// Android: real data from UsageStatsManager.
   Widget _buildFlutterReport() {
-    final total = totalMinutes ??
+    final total =
+        totalMinutes ??
         apps.fold<int>(0, (sum, item) => sum + item.durationMinutes);
     final maxAppMinutes = apps.isEmpty
         ? 1
@@ -172,8 +168,10 @@ class DailyScreenTimeCard extends StatelessWidget {
           )
         else
           ...apps.map((item) {
-            final ratio =
-                (item.durationMinutes / maxAppMinutes).clamp(0.08, 1.0);
+            final ratio = (item.durationMinutes / maxAppMinutes).clamp(
+              0.08,
+              1.0,
+            );
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: SizedBox(
@@ -253,7 +251,9 @@ class DailyScreenTimeCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                Platform.isAndroid ? 'Allow Usage Access' : 'Connect Screen Time',
+                Platform.isAndroid
+                    ? 'Allow Usage Access'
+                    : 'Connect Screen Time',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
