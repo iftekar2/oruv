@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -117,11 +118,19 @@ class DailyScreenTimeCard extends StatelessWidget {
       child: SizedBox(
         // Total headline + "Today" + divider + up to 5 tucked-in rows.
         height: 276,
-        child: IgnorePointer(
-          child: UiKitView(
-            viewType: 'oruv/device_activity_report',
-            creationParamsCodec: StandardMessageCodec(),
-          ),
+        child: Stack(
+          children: [
+            UiKitView(
+              viewType: 'oruv/device_activity_report',
+              creationParamsCodec: StandardMessageCodec(),
+              hitTestBehavior: PlatformViewHitTestBehavior.transparent,
+            ),
+            Positioned.fill(
+              child: ColoredBox(
+                color: Color(0x01FFFFFF),
+              ),
+            ),
+          ],
         ),
       ),
     );

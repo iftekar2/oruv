@@ -77,5 +77,6 @@ struct TotalActivityView: View {
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(Color.white)
+        .allowsHitTesting(false)
     }
 }

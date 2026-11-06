@@ -278,6 +278,7 @@ struct NativeDeviceActivityReportContainerView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(Color.white)
     .ignoresSafeArea(.all)
+    .allowsHitTesting(false)
   }
 }
 #endif
@@ -440,12 +441,18 @@ class AppTokenTitlePlatformView: NSObject, FlutterPlatformView {
   }
 }
 
+class DeviceActivityContainerView: UIView {
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    return nil
+  }
+}
+
 class DeviceActivityReportPlatformView: NSObject, FlutterPlatformView {
   private let containerView: UIView
   private var hostingController: UIViewController?
 
   init(frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) {
-    self.containerView = UIView(frame: frame)
+    self.containerView = DeviceActivityContainerView(frame: frame)
     self.containerView.backgroundColor = .white
     self.containerView.clipsToBounds = true
     self.containerView.isUserInteractionEnabled = false
