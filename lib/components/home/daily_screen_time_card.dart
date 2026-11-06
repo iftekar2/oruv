@@ -175,65 +175,51 @@ class DailyScreenTimeCard extends StatelessWidget {
             final ratio =
                 (item.durationMinutes / maxAppMinutes).clamp(0.08, 1.0);
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 9),
-              child: Row(
-                children: [
-                  SizedBox(width: 34, height: 34, child: _buildItemIcon(item)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.lora(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: _primaryText,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              item.formattedDuration,
-                              style: GoogleFonts.lora(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: item.barColor == _emeraldGreen
-                                    ? _emeraldGreen
-                                    : _primaryText,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 7),
-                        Container(
-                          height: 4.5,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: _trackColor,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: ratio,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: item.barColor,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: SizedBox(
+                height: 40,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 34,
+                      height: 34,
+                      child: _buildItemIcon(item),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Container(
+                        height: 4.5,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: _trackColor,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: ratio,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: item.barColor,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      item.formattedDuration,
+                      style: GoogleFonts.lora(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: item.barColor == _emeraldGreen
+                            ? _emeraldGreen
+                            : _primaryText,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           }),

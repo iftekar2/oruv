@@ -35,8 +35,9 @@ struct TotalActivityView: View {
             } else {
                 ForEach(configuration.apps) { item in
                     let ratio = min(1.0, max(0.08, Double(item.durationMinutes) / Double(maxMins)))
-                    HStack(spacing: 12) {
-                        // Real App Icon from iOS Screen Time
+
+                    HStack(alignment: .center, spacing: 14) {
+                        // App Icon (vertically centered)
                         Label(item.token)
                             .labelStyle(.iconOnly)
                             .frame(width: 34, height: 34)
@@ -47,36 +48,30 @@ struct TotalActivityView: View {
                                     .stroke(Color(red: 0.925, green: 0.910, blue: 0.894), lineWidth: 0.8)
                             )
 
-                        VStack(alignment: .leading, spacing: 7) {
-                            HStack {
-                                Label(item.token)
-                                    .labelStyle(.titleOnly)
-                                    .font(.system(size: 13.5, weight: .semibold, design: .serif))
-                                    .foregroundColor(primaryText)
-                                    .lineLimit(1)
+                        // Timer Bar (centered vertically with the icon)
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(trackColor)
+                                    .frame(height: 4.5)
 
-                                Spacer()
-
-                                Text(item.formattedDuration)
-                                    .font(.system(size: 12.5, weight: .semibold, design: .serif))
-                                    .foregroundColor(primaryText)
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(coralPink)
+                                    .frame(width: max(4.5, geo.size.width * ratio), height: 4.5)
                             }
-
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(trackColor)
-                                        .frame(height: 4.5)
-
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(coralPink)
-                                        .frame(width: geo.size.width * ratio, height: 4.5)
-                                }
-                            }
-                            .frame(height: 4.5)
+                            .frame(maxHeight: .infinity, alignment: .center)
                         }
+                        .frame(height: 4.5)
+
+                        // Duration Text (vertically centered with the icon)
+                        Text(item.formattedDuration)
+                            .font(.system(size: 13, weight: .semibold, design: .serif))
+                            .foregroundColor(primaryText)
+                            .lineLimit(1)
+                            .layoutPriority(1)
                     }
-                    .padding(.vertical, 8)
+                    .frame(height: 40)
+                    .padding(.vertical, 3)
                 }
             }
         }
