@@ -84,6 +84,8 @@ nonisolated struct TotalActivityReport: DeviceActivityReportScene {
             .map { $0 }
 
         let totalMinutes = max(0, Int(totalSeconds / 60))
+        let sharedDefaults = UserDefaults(suiteName: "group.app.iftekarhossain.oruv")
+        sharedDefaults?.set(totalMinutes, forKey: "oruv_daily_total_minutes")
         return DailyScreenTimeConfiguration(
             totalMinutes: totalMinutes,
             apps: sortedItems

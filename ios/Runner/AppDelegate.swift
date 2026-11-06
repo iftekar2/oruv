@@ -704,6 +704,16 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
           case "syncShield":
             let args = call.arguments as? [String: Any]
             let shouldBlock = (args?["shouldBlock"] as? Bool) ?? true
+            let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
+            if let sessionRemaining = args?["sessionRemaining"] as? String {
+              sharedDefaults?.set(sessionRemaining, forKey: "oruv_session_remaining")
+            }
+            if let protectedToday = args?["protectedToday"] as? String {
+              sharedDefaults?.set(protectedToday, forKey: "oruv_protected_today")
+            }
+            if let scheduleTitle = args?["scheduleTitle"] as? String {
+              sharedDefaults?.set(scheduleTitle, forKey: "oruv_schedule_title")
+            }
             ScreenTimeManager.shared.syncShield(shouldBlock: shouldBlock)
             result(true)
           default:

@@ -96,14 +96,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _syncShieldAndStats() async {
-    await ScheduleService.syncNativeShield(
-      rules: _rules,
-      isOnMindfulBreak: _isOnMindfulBreak,
-    );
-
     final snapshot = ScheduleService.computeLiveSnapshot(
       rules: _rules,
       mindfulBreakMinutesToday: _mindfulBreakMinutesToday,
+    );
+
+    final sessionRemaining = snapshot.activeRule != null
+        ? ScheduleRuleModel.formatDurationMinutes(
+            snapshot.activeRule!.currentCycleRemainingMinutes)
+        : null;
+
+    await ScheduleService.syncNativeShield(
+      rules: _rules,
+      isOnMindfulBreak: _isOnMindfulBreak,
+      sessionRemaining: sessionRemaining,
+      protectedToday: snapshot.focusedDuration,
+      scheduleTitle: snapshot.title,
     );
 
     await ScheduleService.syncDailyStats(
