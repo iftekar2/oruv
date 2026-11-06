@@ -620,7 +620,6 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
       #if canImport(FamilyControls)
       if #available(iOS 16.0, *) {
         ScreenTimeManager.shared.methodChannel = screenTimeChannel
-        ScreenTimeManager.shared.startDailyDeviceActivityMonitoring()
       }
       if let registrar = self.registrar(forPlugin: "OruvFamilyActivityPicker") {
         let pickerFactory = FamilyActivityPickerFactory(messenger: registrar.messenger())
@@ -667,10 +666,6 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
             }
           case "checkAuthorizationStatus":
             let isApproved = AuthorizationCenter.shared.authorizationStatus == .approved
-            if isApproved {
-              ScreenTimeManager.shared.startDailyDeviceActivityMonitoring()
-            }
-            ScreenTimeManager.shared.notifyFlutter()
             result([
               "authorized": isApproved
             ])

@@ -4,15 +4,27 @@ import 'package:flutter/services.dart';
 import 'package:oruv/components/home/daily_screen_time_card.dart';
 
 class DailyScreenTimeSnapshot {
+  /// Whether the user granted Screen Time (iOS) / Usage Access (Android).
   final bool isAuthorized;
+
+  /// Real total minutes for today. Null when the OS did not provide data.
   final int? totalMinutes;
-  final List<AppScreenTimeItem>? apps;
+
+  /// Real per-app usage for today (Android only). Never fabricated.
+  final List<AppScreenTimeItem> apps;
+
+  /// On iOS, Apple only exposes real usage data inside a
+  /// `DeviceActivityReport` extension, so the card must embed that native view.
+  final bool useNativeIosReport;
 
   const DailyScreenTimeSnapshot({
     required this.isAuthorized,
     this.totalMinutes,
-    this.apps,
+    this.apps = const [],
+    this.useNativeIosReport = false,
   });
+
+  static const unavailable = DailyScreenTimeSnapshot(isAuthorized: false);
 }
 
 class ScreenTimeService {
@@ -20,45 +32,53 @@ class ScreenTimeService {
 
   static const Color _coralPink = Color(0xFFF26879);
   static const Color _emeraldGreen = Color(0xFF1D6F58);
-  static const Color _tealAccent = Color(0xFF3BBA9C);
 
-  /// Queries native iOS (`FamilyControls` / `DeviceActivity`) or Android
-  /// (`UsageStatsManager` + `PackageManager`) for today's screen time and
-  /// real OS app icons.
+  /// Fetches today's REAL screen time.
+  ///
+  /// - iOS: returns `useNativeIosReport: true` when authorized. The actual
+  ///   numbers + icons are rendered by the `ScreenTimeReportExtension`
+  ///   (Apple does not allow the main app to read usage minutes).
+  /// - Android: queries `UsageStatsManager` + `PackageManager` for real
+  ///   durations and real app icons.
   static Future<DailyScreenTimeSnapshot> fetchDailyScreenTime({
     int maxApps = 5,
   }) async {
     if (!Platform.isIOS && !Platform.isAndroid) {
-      return const DailyScreenTimeSnapshot(isAuthorized: false);
+      return DailyScreenTimeSnapshot.unavailable;
     }
 
     try {
+      if (Platform.isIOS) {
+        final res = await _channel
+            .invokeMapMethod<String, dynamic>('checkAuthorizationStatus');
+        final authorized = res?['authorized'] == true;
+        return DailyScreenTimeSnapshot(
+          isAuthorized: authorized,
+          useNativeIosReport: authorized,
+        );
+      }
+
+      // Android
       final res = await _channel.invokeMapMethod<String, dynamic>(
         'getDailyScreenTime',
         {'maxApps': maxApps},
       );
-      if (res == null) {
-        return const DailyScreenTimeSnapshot(isAuthorized: false);
-      }
+      if (res == null) return DailyScreenTimeSnapshot.unavailable;
 
       final authorized = res['authorized'] == true;
+      if (!authorized) return DailyScreenTimeSnapshot.unavailable;
+
       final rawTotal = (res['totalMinutes'] as num?)?.toInt() ?? 0;
       final rawApps = res['apps'];
+      final parsedApps = <AppScreenTimeItem>[];
 
-      // 1. Direct app list from OS (Android UsageStatsManager + PackageManager iconBytes,
-      //    or cached iOS extension report entries)
-      if (rawApps is List && rawApps.isNotEmpty) {
-        final parsedApps = <AppScreenTimeItem>[];
+      if (rawApps is List) {
         for (int i = 0; i < rawApps.length; i++) {
           final entry = rawApps[i];
           if (entry is! Map) continue;
           final map = Map<String, dynamic>.from(entry);
-          final id = (map['id'] ?? 'app_$i').toString();
           final name = (map['name'] ?? 'App').toString();
-          final durationMinutes =
-              (map['durationMinutes'] as num?)?.toInt() ?? 1;
-          final isOwnApp =
-              map['isOwnApp'] == true || name.toLowerCase().contains('oruv');
+          final isOwnApp = map['isOwnApp'] == true;
 
           Uint8List? iconBytes;
           final rawBytes = map['iconBytes'];
@@ -70,95 +90,28 @@ class ScreenTimeService {
 
           parsedApps.add(
             AppScreenTimeItem(
-              id: id,
+              id: (map['id'] ?? 'app_$i').toString(),
               name: name,
-              durationMinutes: durationMinutes,
+              durationMinutes: (map['durationMinutes'] as num?)?.toInt() ?? 0,
               barColor: isOwnApp ? _emeraldGreen : _coralPink,
               iconBytes: iconBytes,
             ),
           );
         }
-
-        if (parsedApps.isNotEmpty) {
-          final total = rawTotal > 0
-              ? rawTotal
-              : parsedApps.fold<int>(
-                  0,
-                  (sum, item) => sum + item.durationMinutes,
-                );
-          return DailyScreenTimeSnapshot(
-            isAuthorized: authorized,
-            totalMinutes: total,
-            apps: parsedApps,
-          );
-        }
-      }
-
-      // 2. On iOS: if the user has selected apps/categories in FamilyActivityPicker,
-      //    render their real iOS icons and real iOS names via FamilyControls Label(token).
-      if (Platform.isIOS) {
-        final appsCount = (res['appsCount'] as num?)?.toInt() ?? 0;
-        final categoriesCount = (res['categoriesCount'] as num?)?.toInt() ?? 0;
-
-        if (appsCount > 0 || categoriesCount > 0) {
-          const sampleDurations = [88, 87, 65, 52, 14, 11];
-          final tokenItems = <AppScreenTimeItem>[];
-
-          for (int i = 0; i < appsCount && tokenItems.length < maxApps; i++) {
-            final mins = sampleDurations[tokenItems.length % sampleDurations.length];
-            tokenItems.add(
-              AppScreenTimeItem(
-                id: 'ios_app_token_$i',
-                name: 'App ${i + 1}',
-                durationMinutes: mins,
-                barColor: _coralPink,
-                iosTokenIndex: i,
-                isIosCategory: false,
-              ),
-            );
-          }
-
-          for (int i = 0;
-              i < categoriesCount && tokenItems.length < maxApps;
-              i++) {
-            final mins = sampleDurations[tokenItems.length % sampleDurations.length];
-            tokenItems.add(
-              AppScreenTimeItem(
-                id: 'ios_cat_token_$i',
-                name: 'Category ${i + 1}',
-                durationMinutes: mins,
-                barColor: _tealAccent,
-                iosTokenIndex: i,
-                isIosCategory: true,
-              ),
-            );
-          }
-
-          if (tokenItems.isNotEmpty) {
-            final sumMinutes = tokenItems.fold<int>(
-              0,
-              (sum, item) => sum + item.durationMinutes,
-            );
-            return DailyScreenTimeSnapshot(
-              isAuthorized: authorized,
-              totalMinutes: rawTotal > 0 ? rawTotal : sumMinutes,
-              apps: tokenItems,
-            );
-          }
-        }
       }
 
       return DailyScreenTimeSnapshot(
-        isAuthorized: authorized,
-        totalMinutes: rawTotal > 0 ? rawTotal : null,
+        isAuthorized: true,
+        totalMinutes: rawTotal,
+        apps: parsedApps,
       );
     } catch (e) {
       debugPrint('ScreenTimeService.fetchDailyScreenTime note: $e');
-      return const DailyScreenTimeSnapshot(isAuthorized: false);
+      return DailyScreenTimeSnapshot.unavailable;
     }
   }
 
-  /// Requests native Screen Time (iOS FamilyControls) or Usage Access (Android UsageStatsManager) permission.
+  /// Requests Screen Time (iOS) or Usage Access (Android) permission.
   static Future<bool> requestAuthorization() async {
     if (!Platform.isIOS && !Platform.isAndroid) return false;
     try {
@@ -170,4 +123,3 @@ class ScreenTimeService {
     }
   }
 }
-

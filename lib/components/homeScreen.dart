@@ -22,7 +22,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentTabIndex = 0;
 
   bool _isOnMindfulBreak = false;
@@ -41,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeDataAndShields();
 
     // Refresh live progress %, remaining time, and shield enforcement every 15s
@@ -52,35 +53,46 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _initializeDataAndShields() async {
-    await ScheduleService.refreshNativeSelectionCounts(
-      onCountUpdated: (_) {
-        if (mounted) {
-          setState(() {});
-          _syncShieldAndStats();
-          _refreshDailyScreenTime();
-        }
-      },
-    );
+    try {
+      await ScheduleService.refreshNativeSelectionCounts(
+        onCountUpdated: (_) {
+          if (mounted) {
+            setState(() {});
+          }
+        },
+      );
 
-    final loadedRules = await ScheduleService.loadSchedules();
-    final screenTime = await ScreenTimeService.fetchDailyScreenTime();
-    if (!mounted) return;
+      final loadedRules = await ScheduleService.loadSchedules();
+      final screenTime = await ScreenTimeService.fetchDailyScreenTime();
+      if (!mounted) return;
 
-    setState(() {
-      _rules = loadedRules;
-      _screenTimeSnapshot = screenTime;
-      _isLoadingSchedules = false;
-    });
+      setState(() {
+        _rules = loadedRules;
+        _screenTimeSnapshot = screenTime;
+        _isLoadingSchedules = false;
+      });
 
-    await _syncShieldAndStats();
+      await _syncShieldAndStats();
+    } catch (e) {
+      debugPrint('HomeScreen._initializeDataAndShields note: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingSchedules = false;
+        });
+      }
+    }
   }
 
   Future<void> _refreshDailyScreenTime() async {
-    final screenTime = await ScreenTimeService.fetchDailyScreenTime();
-    if (!mounted) return;
-    setState(() {
-      _screenTimeSnapshot = screenTime;
-    });
+    try {
+      final screenTime = await ScreenTimeService.fetchDailyScreenTime();
+      if (!mounted) return;
+      setState(() {
+        _screenTimeSnapshot = screenTime;
+      });
+    } catch (e) {
+      debugPrint('HomeScreen._refreshDailyScreenTime note: $e');
+    }
   }
 
   Future<void> _syncShieldAndStats() async {
@@ -101,7 +113,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-query real usage when returning from Settings / other apps.
+    if (state == AppLifecycleState.resumed) {
+      _refreshDailyScreenTime();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _liveClockTimer?.cancel();
     _mindfulBreakTimer?.cancel();
     super.dispose();
@@ -401,8 +422,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Feature 2: Daily Screen Time Card (Middle of screen, above Rules & Schedules)
           DailyScreenTimeCard(
+            isAuthorized: _screenTimeSnapshot?.isAuthorized ?? false,
+            useNativeIosReport:
+                _screenTimeSnapshot?.useNativeIosReport ?? false,
             totalMinutes: _screenTimeSnapshot?.totalMinutes,
-            apps: _screenTimeSnapshot?.apps,
+            apps: _screenTimeSnapshot?.apps ?? const [],
+            onConnect: () async {
+              await ScreenTimeService.requestAuthorization();
+              await _refreshDailyScreenTime();
+            },
             onTapHeader: () {
               setState(() {
                 _currentTabIndex = 2; // Navigate to Insights tab
