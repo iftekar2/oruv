@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 class AppBadgeInfo {
@@ -271,6 +272,149 @@ class ScheduleRuleModel {
       }
     } catch (_) {}
     return null;
+  }
+
+  static const List<String> orderedDayKeys = [
+    'M',
+    'T',
+    'W',
+    'T2',
+    'F',
+    'S',
+    'S2',
+  ];
+
+  static String dayKeyToShortName(String key) {
+    switch (key) {
+      case 'M':
+        return 'Mon';
+      case 'T':
+        return 'Tue';
+      case 'W':
+        return 'Wed';
+      case 'T2':
+        return 'Thu';
+      case 'F':
+        return 'Fri';
+      case 'S':
+        return 'Sat';
+      case 'S2':
+        return 'Sun';
+      default:
+        return key;
+    }
+  }
+
+  static Map<int, List<List<int>>> _buildDailyIntervals({
+    required int startMins,
+    required int endMins,
+    required Set<String> activeDays,
+  }) {
+    final intervals = <int, List<List<int>>>{};
+    for (int i = 0; i < 7; i++) {
+      intervals[i] = [];
+    }
+
+    final effectiveDays = activeDays.isEmpty
+        ? orderedDayKeys.toSet()
+        : activeDays;
+
+    for (int i = 0; i < orderedDayKeys.length; i++) {
+      final key = orderedDayKeys[i];
+      if (!effectiveDays.contains(key)) continue;
+
+      if (startMins <= endMins) {
+        // Same-day schedule: [startMins, endMins)
+        intervals[i]!.add([startMins, endMins]);
+      } else {
+        // Overnight schedule: evening portion on day i, morning portion on day (i + 1) % 7
+        intervals[i]!.add([startMins, 1440]);
+        final nextDay = (i + 1) % 7;
+        intervals[nextDay]!.add([0, endMins]);
+      }
+    }
+    return intervals;
+  }
+
+  /// Checks if two sets of time windows and active days overlap.
+  static bool checkTimeOverlap({
+    required String startTime1,
+    required String endTime1,
+    required Set<String> activeDays1,
+    required String startTime2,
+    required String endTime2,
+    required Set<String> activeDays2,
+  }) {
+    final s1 = parseMinutesFromMidnight(startTime1);
+    final e1 = parseMinutesFromMidnight(endTime1);
+    final s2 = parseMinutesFromMidnight(startTime2);
+    final e2 = parseMinutesFromMidnight(endTime2);
+
+    if (s1 == null || e1 == null || s2 == null || e2 == null) return false;
+
+    final intervals1 = _buildDailyIntervals(
+      startMins: s1,
+      endMins: e1,
+      activeDays: activeDays1,
+    );
+    final intervals2 = _buildDailyIntervals(
+      startMins: s2,
+      endMins: e2,
+      activeDays: activeDays2,
+    );
+
+    for (int day = 0; day < 7; day++) {
+      final list1 = intervals1[day] ?? [];
+      final list2 = intervals2[day] ?? [];
+      for (final int1 in list1) {
+        for (final int2 in list2) {
+          final overlapStart = math.max(int1[0], int2[0]);
+          final overlapEnd = math.min(int1[1], int2[1]);
+          if (overlapStart < overlapEnd) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Returns the first schedule in [existingRules] that overlaps with the given time and days,
+  /// optionally excluding a rule by [excludeRuleId].
+  static ScheduleRuleModel? findConflictingSchedule({
+    required String startTime,
+    required String endTime,
+    required Set<String> activeDays,
+    required List<ScheduleRuleModel> existingRules,
+    String? excludeRuleId,
+  }) {
+    for (final rule in existingRules) {
+      if (excludeRuleId != null && rule.id == excludeRuleId) continue;
+      final overlaps = checkTimeOverlap(
+        startTime1: startTime,
+        endTime1: endTime,
+        activeDays1: activeDays,
+        startTime2: rule.startTime,
+        endTime2: rule.endTime,
+        activeDays2: rule.activeDays,
+      );
+      if (overlaps) {
+        return rule;
+      }
+    }
+    return null;
+  }
+
+  /// Returns true if this schedule overlaps in time and day with [other].
+  bool overlapsWith(ScheduleRuleModel other) {
+    return checkTimeOverlap(
+      startTime1: startTime,
+      endTime1: endTime,
+      activeDays1: activeDays,
+      startTime2: other.startTime,
+      endTime2: other.endTime,
+      activeDays2: other.activeDays,
+    );
   }
 
   static String formatDurationMinutes(int totalMinutes) {

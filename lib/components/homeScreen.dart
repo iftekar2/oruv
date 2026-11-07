@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/home/adjust_anchor_sheet.dart';
 import 'package:oruv/components/home/daily_screen_time_card.dart';
@@ -284,6 +285,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         initialStartTime: initialStart,
         initialEndTime: initialEnd,
         initialStrictLock: initialStrict,
+        existingRules: _rules,
+        targetRuleId: targetRule?.id,
+        activeDays: targetRule?.activeDays ?? const {'M', 'T', 'W', 'T2', 'F'},
         onSave: (start, end, strict) async {
           if (targetRule != null) {
             final updated = targetRule.copyWith(
@@ -310,6 +314,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _handleRuleToggled(String ruleId, bool isActive) async {
+    if (isActive) {
+      final rule = _rules.firstWhere((r) => r.id == ruleId);
+      final otherActiveRules =
+          _rules.where((r) => r.isActive && r.id != ruleId).toList();
+      final conflict = ScheduleRuleModel.findConflictingSchedule(
+        startTime: rule.startTime,
+        endTime: rule.endTime,
+        activeDays: rule.activeDays,
+        existingRules: otherActiveRules,
+      );
+      if (conflict != null) {
+        HapticFeedback.vibrate();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Cannot activate "${rule.title}": overlaps with active schedule "${conflict.title}" (${conflict.timeRange}).',
+            ),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        return;
+      }
+    }
+
     ScheduleRuleModel? updatedRule;
     setState(() {
       _rules = _rules.map((r) {
@@ -333,6 +361,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => RuleEditorSheet(
+        existingRules: _rules,
         onSave: (newRule) async {
           setState(() {
             _rules = [newRule, ..._rules];
@@ -351,6 +380,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => RuleEditorSheet(
+        existingRules: _rules,
         existingRule: rule,
         onSave: (updatedRule) async {
           setState(() {

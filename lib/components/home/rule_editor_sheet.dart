@@ -6,12 +6,14 @@ import 'package:oruv/components/home/models/home_models.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 
 class RuleEditorSheet extends StatefulWidget {
+  final List<ScheduleRuleModel> existingRules;
   final ScheduleRuleModel? existingRule;
   final ValueChanged<ScheduleRuleModel> onSave;
   final VoidCallback? onDelete;
 
   const RuleEditorSheet({
     super.key,
+    this.existingRules = const [],
     this.existingRule,
     required this.onSave,
     this.onDelete,
@@ -208,7 +210,33 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
     }
   }
 
+  ScheduleRuleModel? get _conflictingRule {
+    return ScheduleRuleModel.findConflictingSchedule(
+      startTime: _startTime,
+      endTime: _endTime,
+      activeDays: _activeDays.isEmpty
+          ? {'M', 'T', 'W', 'T2', 'F'}
+          : _activeDays,
+      existingRules: widget.existingRules,
+      excludeRuleId: widget.existingRule?.id,
+    );
+  }
+
   void _handleSave() {
+    final conflict = _conflictingRule;
+    if (conflict != null) {
+      HapticFeedback.vibrate();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Cannot save: overlaps with "${conflict.title}" (${conflict.timeRange}).',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+
     final title = _titleController.text.trim().isEmpty
         ? 'Focus Schedule'
         : _titleController.text.trim();
@@ -241,6 +269,8 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.existingRule != null;
+    final conflict = _conflictingRule;
+    final hasConflict = conflict != null;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Container(
@@ -795,6 +825,64 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
                       }).toList(),
                     ),
 
+                    if (hasConflict) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFDF3E7),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFFE89A58).withOpacity(0.5),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(top: 2),
+                              child: Icon(
+                                Icons.warning_amber_rounded,
+                                size: 20,
+                                color: Color(0xFFC06A28),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Schedule Conflict',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF8A4612),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'This time overlaps with "${conflict!.title}" (${conflict.timeRange}). Please pick another time or adjust active days.',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      height: 1.35,
+                                      fontWeight: FontWeight.w500,
+                                      color: const Color(0xFF8A4612)
+                                          .withOpacity(0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 16),
 
                     // Save Button
@@ -802,17 +890,21 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: _handleSave,
+                        onPressed: hasConflict ? null : _handleSave,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF131B26),
+                          disabledBackgroundColor: const Color(0xFFD6D1CB),
                           foregroundColor: Colors.white,
+                          disabledForegroundColor: const Color(0xFF8A8580),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(28),
                           ),
                         ),
                         child: Text(
-                          isEditing ? 'Save Changes' : 'Create Schedule',
+                          hasConflict
+                              ? 'Time Slot Overlaps'
+                              : (isEditing ? 'Save Changes' : 'Create Schedule'),
                           style: GoogleFonts.lora(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,

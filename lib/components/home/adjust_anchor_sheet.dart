@@ -2,12 +2,16 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:oruv/components/home/models/home_models.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 
 class AdjustAnchorSheet extends StatefulWidget {
   final String initialStartTime;
   final String initialEndTime;
   final bool initialStrictLock;
+  final List<ScheduleRuleModel> existingRules;
+  final String? targetRuleId;
+  final Set<String> activeDays;
   final void Function(String startTime, String endTime, bool strictLock)
       onSave;
 
@@ -17,6 +21,9 @@ class AdjustAnchorSheet extends StatefulWidget {
     required this.initialEndTime,
     required this.initialStrictLock,
     required this.onSave,
+    this.existingRules = const [],
+    this.targetRuleId,
+    this.activeDays = const {'M', 'T', 'W', 'T2', 'F'},
   });
 
   @override
@@ -33,6 +40,16 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
   static const Color _primaryText = Color(0xFF1B1B1D);
   static const Color _mutedText = Color(0xFF6E6A6E);
   static const Color _cardBorder = Color(0xFFECE8E4);
+
+  ScheduleRuleModel? get _conflictingRule {
+    return ScheduleRuleModel.findConflictingSchedule(
+      startTime: _startTime,
+      endTime: _endTime,
+      activeDays: widget.activeDays,
+      existingRules: widget.existingRules,
+      excludeRuleId: widget.targetRuleId,
+    );
+  }
 
   @override
   void initState() {
@@ -148,6 +165,8 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
   @override
   Widget build(BuildContext context) {
     final selectedCount = OnboardingData.instance.totalSelectedAppsCount;
+    final conflict = _conflictingRule;
+    final hasConflict = conflict != null;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
@@ -451,25 +470,85 @@ class _AdjustAnchorSheetState extends State<AdjustAnchorSheet> {
                 ],
               ),
             ),
+            if (hasConflict) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDF3E7),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFFE89A58).withOpacity(0.5),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(
+                        Icons.warning_amber_rounded,
+                        size: 20,
+                        color: Color(0xFFC06A28),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Schedule Conflict',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF8A4612),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'This time overlaps with "${conflict!.title}" (${conflict.timeRange}). Please pick another time.',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              height: 1.35,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF8A4612).withOpacity(0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  widget.onSave(_startTime, _endTime, _strictLock);
-                },
+                onPressed: hasConflict
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        widget.onSave(_startTime, _endTime, _strictLock);
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF131B26),
+                  disabledBackgroundColor: const Color(0xFFD6D1CB),
                   foregroundColor: Colors.white,
+                  disabledForegroundColor: const Color(0xFF8A8580),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(28),
                   ),
                 ),
                 child: Text(
-                  'Save Anchor Schedule',
+                  hasConflict ? 'Time Slot Overlaps' : 'Save Anchor Schedule',
                   style: GoogleFonts.lora(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
