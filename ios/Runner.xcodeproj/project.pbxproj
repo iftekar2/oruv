@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 70;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -119,21 +119,21 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A420026F309D6B0F00A066D7 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		A420026F309D6B0F00A066D7 /* Exceptions for "ScreenTimeReportExtension" folder in "ScreenTimeReportExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
 			target = A420025D309D6B0F00A066D7 /* ScreenTimeReportExtension */;
 		};
-		A430006F309D6B0F00A066D7 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		A430006F309D6B0F00A066D7 /* Exceptions for "ShieldConfigurationExtension" folder in "ShieldConfigurationExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
 			target = A430005D309D6B0F00A066D7 /* ShieldConfigurationExtension */;
 		};
-		A440006F309D6B0F00A066D7 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		A440006F309D6B0F00A066D7 /* Exceptions for "ShieldActionExtension" folder in "ShieldActionExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -143,9 +143,42 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A420025F309D6B0F00A066D7 /* ScreenTimeReportExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A420026F309D6B0F00A066D7 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ScreenTimeReportExtension; sourceTree = "<group>"; };
-		A430005F309D6B0F00A066D7 /* ShieldConfigurationExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A430006F309D6B0F00A066D7 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ShieldConfigurationExtension; sourceTree = "<group>"; };
-		A440005F309D6B0F00A066D7 /* ShieldActionExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A440006F309D6B0F00A066D7 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ShieldActionExtension; sourceTree = "<group>"; };
+		A420025F309D6B0F00A066D7 /* ScreenTimeReportExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A420026F309D6B0F00A066D7 /* Exceptions for "ScreenTimeReportExtension" folder in "ScreenTimeReportExtension" target */,
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = ScreenTimeReportExtension;
+			sourceTree = "<group>";
+		};
+		A430005F309D6B0F00A066D7 /* ShieldConfigurationExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A430006F309D6B0F00A066D7 /* Exceptions for "ShieldConfigurationExtension" folder in "ShieldConfigurationExtension" target */,
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = ShieldConfigurationExtension;
+			sourceTree = "<group>";
+		};
+		A440005F309D6B0F00A066D7 /* ShieldActionExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A440006F309D6B0F00A066D7 /* Exceptions for "ShieldActionExtension" folder in "ShieldActionExtension" target */,
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = ShieldActionExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -339,8 +372,6 @@
 				A420025F309D6B0F00A066D7 /* ScreenTimeReportExtension */,
 			);
 			name = ScreenTimeReportExtension;
-			packageProductDependencies = (
-			);
 			productName = ScreenTimeReportExtension;
 			productReference = A420025E309D6B0F00A066D7 /* ScreenTimeReportExtension.appex */;
 			productType = "com.apple.product-type.extensionkit-extension";
@@ -361,8 +392,6 @@
 				A430005F309D6B0F00A066D7 /* ShieldConfigurationExtension */,
 			);
 			name = ShieldConfigurationExtension;
-			packageProductDependencies = (
-			);
 			productName = ShieldConfigurationExtension;
 			productReference = A430005E309D6B0F00A066D7 /* ShieldConfigurationExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -383,8 +412,6 @@
 				A440005F309D6B0F00A066D7 /* ShieldActionExtension */,
 			);
 			name = ShieldActionExtension;
-			packageProductDependencies = (
-			);
 			productName = ShieldActionExtension;
 			productReference = A440005E309D6B0F00A066D7 /* ShieldActionExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -492,13 +519,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -588,13 +611,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

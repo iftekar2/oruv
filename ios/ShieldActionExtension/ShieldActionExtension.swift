@@ -14,6 +14,46 @@ class ShieldActionExtension: ShieldActionDelegate {
         UserDefaults(suiteName: appGroupId)
     }
 
+    private func resolveName(for tokenKey: String) -> String? {
+        let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupId
+        )
+
+        // 1. Check app_names.json written by ShieldConfigurationExtension
+        if let namesURL = containerURL?.appendingPathComponent("app_names.json"),
+           let data = try? Data(contentsOf: namesURL),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+            if let name = dict[tokenKey], !name.isEmpty {
+                return name
+            }
+            if let last = dict["last"], !last.isEmpty {
+                return last
+            }
+        }
+
+        // 2. Check tokenNames in blocked_attempts.json
+        if let fileURL = containerURL?.appendingPathComponent("blocked_attempts.json"),
+           let data = try? Data(contentsOf: fileURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let tokenNames = json["tokenNames"] as? [String: String],
+           let name = tokenNames[tokenKey], !name.isEmpty {
+            return name
+        }
+
+        // 3. Check UserDefaults token dictionary
+        if let tokenNames = sharedDefaults?.dictionary(forKey: "oruv_blocked_token_names") as? [String: String],
+           let name = tokenNames[tokenKey], !name.isEmpty {
+            return name
+        }
+
+        // 4. Check last shielded app name
+        if let last = sharedDefaults?.string(forKey: "oruv_last_shielded_app_name"), !last.isEmpty {
+            return last
+        }
+
+        return nil
+    }
+
     private func recordConfirmedBlock(tokenKey: String, resolvedName: String?) {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -38,15 +78,24 @@ class ShieldActionExtension: ShieldActionDelegate {
             tokenNames = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_names") as? [String: String]) ?? [:]
         }
 
+        var effectiveName = resolvedName
+        if effectiveName == nil || effectiveName?.isEmpty == true {
+            effectiveName = resolveName(for: tokenKey)
+        }
+
         tokenCounts[tokenKey, default: 0] += 1
-        if let name = resolvedName, !name.isEmpty {
+        if let name = effectiveName, !name.isEmpty {
             tokenNames[tokenKey] = name
         }
 
         let mostBlocked = tokenCounts.max(by: { $0.value < $1.value })
         let topTokenKey = mostBlocked?.key ?? tokenKey
         let topCount = mostBlocked?.value ?? tokenCounts[tokenKey] ?? 1
-        let topName = tokenNames[topTokenKey] ?? ""
+        let topName = tokenNames[topTokenKey]
+            ?? effectiveName
+            ?? resolveName(for: topTokenKey)
+            ?? sharedDefaults?.string(forKey: "oruv_last_shielded_app_name")
+            ?? ""
         let total = tokenCounts.values.reduce(0, +)
 
         if let fileURL = fileURL {

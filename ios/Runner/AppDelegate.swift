@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import SwiftUI
+import Combine
 #if canImport(FamilyControls)
 import FamilyControls
 import ManagedSettings
@@ -590,9 +591,72 @@ class AppTokenTitleFactory: NSObject, FlutterPlatformViewFactory {
   }
 }
 
-/// Renders the real app or category name for the most-blocked entity today using Apple's FamilyControls token.
 @available(iOS 16.0, *)
-struct NativeMostBlockedAppTitleView: View {
+func extractAppName(from token: ApplicationToken) -> String? {
+  // Method 1: Check known app names in app_names.json
+  if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
+    let namesURL = containerURL.appendingPathComponent("app_names.json")
+    if let data = try? Data(contentsOf: namesURL),
+       let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+      if let encoded = try? PropertyListEncoder().encode(token) {
+        let key = "app:" + encoded.base64EncodedString()
+        if let name = dict[key], !name.isEmpty, name != "App", name != "This app" {
+          return name
+        }
+      }
+      if let last = dict["last"], !last.isEmpty, last != "App", last != "This app" {
+        return last
+      }
+    }
+  }
+
+  // Method 2: Check shared UserDefaults
+  let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
+  if let encoded = try? PropertyListEncoder().encode(token) {
+    let key = "app:" + encoded.base64EncodedString()
+    if let names = sharedDefaults?.dictionary(forKey: "oruv_blocked_token_names") as? [String: String],
+       let name = names[key], !name.isEmpty, name != "App" {
+      return name
+    }
+  }
+  if let last = sharedDefaults?.string(forKey: "oruv_last_shielded_app_name"), !last.isEmpty, last != "App" {
+    return last
+  }
+
+  // Method 3: Inspect hosting controller view hierarchy & accessibility
+  let controller = UIHostingController(rootView: Label(token).labelStyle(.titleOnly))
+  controller.overrideUserInterfaceStyle = .light
+  let view = controller.view!
+  view.frame = CGRect(x: 0, y: 0, width: 300, height: 100)
+  view.layoutIfNeeded()
+
+  func findText(in uiview: UIView) -> String? {
+    if let label = uiview.accessibilityLabel, !label.isEmpty, label != "App", label != "This app" {
+      return label
+    }
+    if let uilabel = uiview as? UILabel, let text = uilabel.text, !text.isEmpty, text != "App" {
+      return text
+    }
+    for sub in uiview.subviews {
+      if let found = findText(in: sub) {
+        return found
+      }
+    }
+    return nil
+  }
+
+  if let found = findText(in: view) {
+    return found
+  }
+
+  return nil
+}
+
+/// Renders a single raw FamilyControls title slot with width=0 so FamilyControlsAgent
+/// uses `Double.nan` for `UISTextLineDrawing` and returns the exact `CTLineGetTypographicBounds`
+/// as `_UISlotView.intrinsicContentSize` without trailing whitespace.
+@available(iOS 16.0, *)
+struct SingleSlotTokenView: View {
   @ObservedObject var manager = ScreenTimeManager.shared
 
   var body: some View {
@@ -600,62 +664,287 @@ struct NativeMostBlockedAppTitleView: View {
       if let appToken = manager.mostBlockedAppToken {
         Label(appToken)
           .labelStyle(.titleOnly)
-          .font(.system(size: 11, weight: .regular, design: .serif))
-          .foregroundColor(Color(red: 0.431, green: 0.416, blue: 0.431))
-          .lineLimit(1)
       } else if let catToken = manager.mostBlockedCategoryToken {
         Label(catToken)
           .labelStyle(.titleOnly)
-          .font(.system(size: 11, weight: .regular, design: .serif))
-          .foregroundColor(Color(red: 0.431, green: 0.416, blue: 0.431))
-          .lineLimit(1)
-      } else {
-        Text("Urges")
-          .font(.system(size: 11, weight: .regular, design: .serif))
-          .foregroundColor(Color(red: 0.431, green: 0.416, blue: 0.431))
-          .lineLimit(1)
       }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-    .background(Color.white)
-    .ignoresSafeArea(.all)
+    .frame(width: 0, height: 25, alignment: .topLeading)
+    .environment(\.sizeCategory, .extraSmall)
+    .environment(\.colorScheme, .light)
+  }
+}
+
+/// Custom UIKit container that extracts `_UISlotView.intrinsicContentSize` (exact pixel width & height
+/// of the app name from `FamilyControlsAgent`), renders 4 sub-pixel-offset copies for a crisp bold weight,
+/// scales the slot so its height matches `"Blocked"` 1:1, and centers `"<AppName> Blocked"` with zero gap.
+@available(iOS 16.0, *)
+class MostBlockedAppTitleContainerView: UIView {
+  private let slotWrapperView = UIView()
+  private var hostingControllers: [UIHostingController<SingleSlotTokenView>] = []
+  private var slotViews: [UIView] = []
+  private let blockedLabel = UILabel()
+  private var layoutTimer: Timer?
+  private var cancellables = Set<AnyCancellable>()
+
+  // Sub-pixel offsets in unscaled slot coordinates (14pt SF Pro) to synthesize SF Pro Bold weight
+  private let boldOffsets: [CGPoint] = [
+    CGPoint(x: 0.0, y: 0.0),
+    CGPoint(x: 0.45, y: 0.0),
+    CGPoint(x: 0.90, y: 0.0),
+    CGPoint(x: 0.45, y: 0.20)
+  ]
+
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    setupViews()
+  }
+
+  required init?(coder: NSCoder) {
+    super.init(coder: coder)
+    setupViews()
+  }
+
+  private func setupViews() {
+    backgroundColor = .white
+    clipsToBounds = true
+    isUserInteractionEnabled = false
+    overrideUserInterfaceStyle = .light
+
+    slotWrapperView.backgroundColor = .clear
+    slotWrapperView.clipsToBounds = false
+    slotWrapperView.layer.anchorPoint = CGPoint(x: 0, y: 0)
+    addSubview(slotWrapperView)
+
+    for offset in boldOffsets {
+      let hosting = UIHostingController(rootView: SingleSlotTokenView())
+      hosting.overrideUserInterfaceStyle = .light
+      if #available(iOS 16.4, *) {
+        hosting.safeAreaRegions = []
+      }
+      hosting.view.backgroundColor = .clear
+      hosting.view.clipsToBounds = false
+      hosting.view.insetsLayoutMarginsFromSafeArea = false
+      hosting.view.frame = CGRect(x: offset.x, y: offset.y, width: 0, height: 25)
+      slotWrapperView.addSubview(hosting.view)
+      hostingControllers.append(hosting)
+    }
+
+    blockedLabel.text = "Blocked"
+    blockedLabel.font = UIFont.systemFont(ofSize: 11.5, weight: .regular)
+    blockedLabel.textColor = UIColor(red: 0.106, green: 0.106, blue: 0.114, alpha: 1.0)
+    blockedLabel.backgroundColor = .clear
+    blockedLabel.numberOfLines = 1
+    blockedLabel.sizeToFit()
+    addSubview(blockedLabel)
+
+    ScreenTimeManager.shared.$mostBlockedAppToken
+      .receive(on: RunLoop.main)
+      .sink { [weak self] _ in
+        self?.resetAndPollSlotMetrics()
+      }
+      .store(in: &cancellables)
+
+    ScreenTimeManager.shared.$mostBlockedCategoryToken
+      .receive(on: RunLoop.main)
+      .sink { [weak self] _ in
+        self?.resetAndPollSlotMetrics()
+      }
+      .store(in: &cancellables)
+
+    startPollingSlotMetrics()
+  }
+
+  private func resetAndPollSlotMetrics() {
+    slotViews.removeAll()
+    for (index, hosting) in hostingControllers.enumerated() {
+      let offset = boldOffsets[index]
+      hosting.view.frame = CGRect(x: offset.x, y: offset.y, width: 0, height: 25)
+      hosting.view.setNeedsLayout()
+    }
+    startPollingSlotMetrics()
+  }
+
+  private func startPollingSlotMetrics() {
+    layoutTimer?.invalidate()
+    var ticks = 0
+    layoutTimer = Timer.scheduledTimer(withTimeInterval: 0.04, repeats: true) { [weak self] timer in
+      guard let self = self else {
+        timer.invalidate()
+        return
+      }
+      ticks += 1
+      self.prepareSlotHierarchyIfNeeded()
+      self.updateExactLayout()
+      if ticks > 60 {
+        timer.invalidate()
+      }
+    }
+  }
+
+  private func findSlotView(in root: UIView) -> UIView? {
+    let typeName = String(describing: type(of: root))
+    if typeName.contains("SlotView") {
+      return root
+    }
+    for sub in root.subviews {
+      if let found = findSlotView(in: sub) {
+        return found
+      }
+    }
+    return nil
+  }
+
+  private func disableClippingRecursively(in view: UIView) {
+    view.clipsToBounds = false
+    view.backgroundColor = .clear
+    for sub in view.subviews {
+      disableClippingRecursively(in: sub)
+    }
+  }
+
+  private func prepareSlotHierarchyIfNeeded() {
+    for hosting in hostingControllers {
+      disableClippingRecursively(in: hosting.view)
+    }
+
+    if slotViews.count < hostingControllers.count {
+      slotViews.removeAll()
+      for hosting in hostingControllers {
+        hosting.view.layoutIfNeeded()
+        if let slot = findSlotView(in: hosting.view) {
+          // Deactivate trailing/bottom/width/height constraints on FamilyActivitySlot so _UISlotView
+          // sizes itself strictly to its intrinsicContentSize (CTLineGetTypographicBounds of the app name).
+          if let familySlot = slot.superview {
+            for constraint in familySlot.constraints {
+              if constraint.firstItem === slot || constraint.secondItem === slot {
+                let a1 = constraint.firstAttribute
+                let a2 = constraint.secondAttribute
+                if a1 == .trailing || a1 == .right || a1 == .bottom || a1 == .width || a1 == .height ||
+                   a2 == .trailing || a2 == .right || a2 == .bottom || a2 == .width || a2 == .height {
+                  constraint.isActive = false
+                }
+              }
+            }
+            familySlot.setNeedsLayout()
+            familySlot.layoutIfNeeded()
+          }
+          slot.setContentHuggingPriority(.required, for: .horizontal)
+          slot.setContentHuggingPriority(.required, for: .vertical)
+          slot.setContentCompressionResistancePriority(.required, for: .horizontal)
+          slot.setContentCompressionResistancePriority(.required, for: .vertical)
+          slotViews.append(slot)
+        }
+      }
+    }
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    prepareSlotHierarchyIfNeeded()
+    updateExactLayout()
+  }
+
+  private func updateExactLayout() {
+    guard bounds.width > 0, bounds.height > 0 else { return }
+
+    let hasToken = ScreenTimeManager.shared.mostBlockedAppToken != nil ||
+                   ScreenTimeManager.shared.mostBlockedCategoryToken != nil
+
+    blockedLabel.text = hasToken ? "Blocked" : "Urges Blocked"
+    blockedLabel.sizeToFit()
+    let blockedSize = blockedLabel.intrinsicContentSize
+
+    guard hasToken, let primarySlot = slotViews.first else {
+      slotWrapperView.isHidden = true
+      blockedLabel.frame = CGRect(
+        x: (bounds.width - blockedSize.width) / 2.0,
+        y: (bounds.height - blockedSize.height) / 2.0,
+        width: blockedSize.width,
+        height: blockedSize.height
+      )
+      return
+    }
+
+    for slot in slotViews {
+      slot.superview?.layoutIfNeeded()
+      slot.layoutIfNeeded()
+    }
+
+    let intrinsic = primarySlot.intrinsicContentSize
+    let rawWidth = max(intrinsic.width, primarySlot.bounds.width)
+    let rawHeight = max(intrinsic.height, primarySlot.bounds.height)
+
+    guard rawWidth > 1.0, rawHeight > 1.0 else {
+      return
+    }
+
+    slotWrapperView.isHidden = false
+
+    // Normalize each hosting.view origin so its _UISlotView sits at exact `boldOffsets[i]` inside slotWrapperView
+    for (index, hosting) in hostingControllers.enumerated() {
+      guard index < slotViews.count else { continue }
+      let slot = slotViews[index]
+      let offset = boldOffsets[index]
+      let slotOriginInHosting = slot.convert(CGPoint.zero, to: hosting.view)
+      hosting.view.frame = CGRect(
+        x: offset.x - slotOriginInHosting.x,
+        y: offset.y - slotOriginInHosting.y,
+        width: 0,
+        height: 25
+      )
+    }
+
+    // Scale the slot so its rendered height is 100% identical to `blockedLabel`'s height
+    var scale = blockedSize.height / rawHeight
+    let rawBoldWidth = rawWidth + 0.90
+    let spacing: CGFloat = 3.5
+
+    let maxTotalWidth = max(20.0, bounds.width - 2.0)
+    if (rawBoldWidth * scale) + spacing + blockedSize.width > maxTotalWidth {
+      let availableForApp = max(16.0, maxTotalWidth - spacing - blockedSize.width)
+      scale = availableForApp / rawBoldWidth
+    }
+
+    let finalAppWidth = rawBoldWidth * scale
+    let finalAppHeight = rawHeight * scale
+    let totalWidth = finalAppWidth + spacing + blockedSize.width
+    let startX = max(0.0, (bounds.width - totalWidth) / 2.0)
+    let appY = (bounds.height - finalAppHeight) / 2.0
+    let blockedY = (bounds.height - blockedSize.height) / 2.0
+
+    slotWrapperView.transform = .identity
+    slotWrapperView.bounds = CGRect(x: 0, y: 0, width: rawBoldWidth, height: rawHeight)
+    slotWrapperView.layer.position = CGPoint(x: startX, y: appY)
+    slotWrapperView.transform = CGAffineTransform(scaleX: scale, y: scale)
+
+    blockedLabel.frame = CGRect(
+      x: startX + finalAppWidth + spacing,
+      y: blockedY,
+      width: blockedSize.width,
+      height: blockedSize.height
+    )
+  }
+
+  deinit {
+    layoutTimer?.invalidate()
   }
 }
 
 class MostBlockedAppTitlePlatformView: NSObject, FlutterPlatformView {
   private let containerView: UIView
-  private var hostingController: UIViewController?
 
   init(frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) {
-    self.containerView = UIView(frame: frame)
-    self.containerView.backgroundColor = .white
-    self.containerView.clipsToBounds = true
-    self.containerView.isUserInteractionEnabled = false
-    super.init()
-
     #if canImport(FamilyControls)
     if #available(iOS 16.0, *) {
-      let swiftUIView = NativeMostBlockedAppTitleView()
-      let hosting = UIHostingController(rootView: swiftUIView)
-      hosting.view.isUserInteractionEnabled = false
-      if #available(iOS 16.4, *) {
-        hosting.safeAreaRegions = []
-      }
-      hosting.view.backgroundColor = .white
-      hosting.view.clipsToBounds = true
-      hosting.view.insetsLayoutMarginsFromSafeArea = false
-      hosting.view.translatesAutoresizingMaskIntoConstraints = false
-      self.containerView.addSubview(hosting.view)
-
-      NSLayoutConstraint.activate([
-        hosting.view.topAnchor.constraint(equalTo: self.containerView.topAnchor),
-        hosting.view.bottomAnchor.constraint(equalTo: self.containerView.bottomAnchor),
-        hosting.view.leadingAnchor.constraint(equalTo: self.containerView.leadingAnchor),
-        hosting.view.trailingAnchor.constraint(equalTo: self.containerView.trailingAnchor)
-      ])
-      self.hostingController = hosting
+      self.containerView = MostBlockedAppTitleContainerView(frame: frame)
+    } else {
+      self.containerView = UIView(frame: frame)
     }
+    #else
+    self.containerView = UIView(frame: frame)
     #endif
+    super.init()
   }
 
   func view() -> UIView {
@@ -856,6 +1145,42 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
             } else if count == 0 {
               ScreenTimeManager.shared.mostBlockedAppToken = nil
               ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+            }
+
+            // 4. Resolve app name from shared app_names.json, token dictionary, or last shielded app name
+            if appName.isEmpty {
+              if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
+                let namesURL = containerURL.appendingPathComponent("app_names.json")
+                if let data = try? Data(contentsOf: namesURL),
+                   let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+                  appName = dict[topTokenKey] ?? dict["last"] ?? ""
+                }
+              }
+            }
+            if appName.isEmpty {
+              let savedTokenNames = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_names") as? [String: String]) ?? [:]
+              appName = savedTokenNames[topTokenKey]
+                ?? sharedDefaults?.string(forKey: "oruv_last_shielded_app_name")
+                ?? sharedDefaults?.string(forKey: "oruv_most_blocked_app_name")
+                ?? ""
+            }
+
+            // 5. If still empty, inspect the native token view directly
+            if appName.isEmpty, let token = ScreenTimeManager.shared.mostBlockedAppToken {
+              if let resolved = extractAppName(from: token), !resolved.isEmpty {
+                appName = resolved
+                sharedDefaults?.set(resolved, forKey: "oruv_most_blocked_app_name")
+                if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
+                  let fileURL = containerURL.appendingPathComponent("blocked_attempts.json")
+                  if let data = try? Data(contentsOf: fileURL),
+                     var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    json["mostBlockedAppName"] = resolved
+                    if let updated = try? JSONSerialization.data(withJSONObject: json, options: []) {
+                      try? updated.write(to: fileURL, options: .atomic)
+                    }
+                  }
+                }
+              }
             }
 
             let hasNativeToken = (ScreenTimeManager.shared.mostBlockedAppToken != nil

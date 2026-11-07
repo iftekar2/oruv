@@ -228,6 +228,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
                       projectedLabel ??
                       (isSavingTime ? 'On Track to Save' : 'Projected Over'),
                   valueColor: isSavingTime ? _accentGreen : _coralRed,
+
                   prefixIcon: Icon(
                     isSavingTime
                         ? Icons.arrow_drop_down_sharp
@@ -237,53 +238,65 @@ class DeepWorkAnchorCard extends StatelessWidget {
                   ),
                 ),
               ),
+
               Container(width: 1, height: 38, color: const Color(0xFFEEEAE6)),
               Expanded(
                 child: _buildMetricColumn(
                   value: mostBlockedAppCount > 0
-                      ? '${mostBlockedAppCount}x'
+                      ? '${mostBlockedAppCount}X'
                       : '0',
                   label: mostBlockedAppCount > 0
                       ? (mostBlockedAppName.isNotEmpty
                             ? '$mostBlockedAppName Blocked'
-                            : 'Blocked Today')
+                            : 'Urges Blocked')
                       : 'Urges Blocked',
                   valueColor: _primaryText,
-                  customLabelWidget:
-                      (mostBlockedAppCount > 0 &&
-                          mostBlockedAppName.isEmpty &&
-                          hasMostBlockedNativeToken &&
-                          Platform.isIOS)
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              height: 14,
-                              child: IgnorePointer(
-                                child: UiKitView(
-                                  key: ValueKey<String>(
-                                    'most_blocked_title_$mostBlockedAppCount',
-                                  ),
-                                  viewType: 'oruv/most_blocked_app_title',
-                                  creationParamsCodec:
-                                      const StandardMessageCodec(),
+                  customLabelWidget: mostBlockedAppCount > 0
+                      ? (mostBlockedAppName.isNotEmpty
+                            ? Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: mostBlockedAppName,
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: _primaryText,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: ' Blocked',
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w400,
+                                        color: _primaryText,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ),
-                            Text(
-                              'Blocked',
-                              style: GoogleFonts.lora(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                                color: _mutedText,
-                                height: 1.15,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        )
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : (hasMostBlockedNativeToken && Platform.isIOS
+                                  ? SizedBox(
+                                      width: double.infinity,
+                                      height: 18,
+                                      child: IgnorePointer(
+                                        child: UiKitView(
+                                          key: ValueKey<String>(
+                                            'most_blocked_title_${mostBlockedAppCount}_$hasMostBlockedNativeToken',
+                                          ),
+                                          viewType:
+                                              'oruv/most_blocked_app_title',
+                                          creationParamsCodec:
+                                              const StandardMessageCodec(),
+                                        ),
+                                      ),
+                                    )
+                                  : null))
                       : null,
                 ),
               ),

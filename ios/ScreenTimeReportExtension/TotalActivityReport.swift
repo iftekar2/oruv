@@ -86,6 +86,20 @@ nonisolated struct TotalActivityReport: DeviceActivityReportScene {
         let totalMinutes = max(0, Int(totalSeconds / 60))
         let sharedDefaults = UserDefaults(suiteName: "group.app.iftekarhossain.oruv")
         sharedDefaults?.set(totalMinutes, forKey: "oruv_daily_total_minutes")
+
+        // Persist known app names to the shared App Group for blocked attempts resolution
+        var tokenNameDict: [String: String] = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_names") as? [String: String]) ?? [:]
+        for (token, info) in appDurations {
+            if !info.name.isEmpty, info.name != "App",
+               let encoded = try? PropertyListEncoder().encode(token) {
+                let tokenKey = "app:" + encoded.base64EncodedString()
+                tokenNameDict[tokenKey] = info.name
+            }
+        }
+        if !tokenNameDict.isEmpty {
+            sharedDefaults?.set(tokenNameDict, forKey: "oruv_blocked_token_names")
+        }
+
         return DailyScreenTimeConfiguration(
             totalMinutes: totalMinutes,
             apps: sortedItems

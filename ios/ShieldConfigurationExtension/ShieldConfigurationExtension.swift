@@ -43,9 +43,67 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let map: [Character: String] = [
             "0": "𝟎", "1": "𝟏", "2": "𝟐", "3": "𝟑", "4": "𝟒",
             "5": "𝟓", "6": "𝟔", "7": "𝟕", "8": "𝟖", "9": "𝟗",
-            "h": "𝐡", "m": "𝐦", " ": "\u{00A0}"
+            "h": "𝐡", "m": "𝐦", "X": "𝐗", "x": "𝐱", " ": "\u{00A0}"
         ]
         return text.map { map[$0] ?? String($0) }.joined()
+    }
+
+    /// Persists the known app name and token mapping to the shared App Group container
+    /// so ShieldActionExtension and the main Flutter app can immediately resolve the app name.
+    private func recordKnownAppName(_ name: String, for tokenKey: String?) {
+        guard !name.isEmpty, name != "This app", name != "This website" else { return }
+
+        let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupId
+        )
+        let namesURL = containerURL?.appendingPathComponent("app_names.json")
+        let fileURL = containerURL?.appendingPathComponent("blocked_attempts.json")
+
+        // 1. Update app_names.json
+        var namesDict: [String: String] = [:]
+        if let namesURL = namesURL,
+           let data = try? Data(contentsOf: namesURL),
+           let saved = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+            namesDict = saved
+        }
+        if let key = tokenKey {
+            namesDict[key] = name
+        }
+        namesDict["last"] = name
+        if let namesURL = namesURL,
+           let data = try? JSONSerialization.data(withJSONObject: namesDict, options: []) {
+            try? data.write(to: namesURL, options: .atomic)
+        }
+
+        // 2. Update blocked_attempts.json if it exists
+        if let fileURL = fileURL,
+           let data = try? Data(contentsOf: fileURL),
+           var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            var tokenNames = (json["tokenNames"] as? [String: String]) ?? [:]
+            if let key = tokenKey {
+                tokenNames[key] = name
+            }
+            json["tokenNames"] = tokenNames
+            let currentTopName = (json["mostBlockedAppName"] as? String) ?? ""
+            if currentTopName.isEmpty {
+                json["mostBlockedAppName"] = name
+            }
+            if let updatedData = try? JSONSerialization.data(withJSONObject: json, options: []) {
+                try? updatedData.write(to: fileURL, options: .atomic)
+            }
+        }
+
+        // 3. Update UserDefaults suite
+        sharedDefaults?.set(name, forKey: "oruv_last_shielded_app_name")
+        var userDefaultsNames = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_names") as? [String: String]) ?? [:]
+        if let key = tokenKey {
+            userDefaultsNames[key] = name
+        }
+        sharedDefaults?.set(userDefaultsNames, forKey: "oruv_blocked_token_names")
+        if (sharedDefaults?.string(forKey: "oruv_most_blocked_app_name") ?? "").isEmpty {
+            sharedDefaults?.set(name, forKey: "oruv_most_blocked_app_name")
+        }
+        sharedDefaults?.synchronize()
     }
 
     /// Resolves the localized display name for a stored token key inside ShieldConfigurationExtension.
@@ -156,8 +214,8 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
         if mostBlockedCount > 0 {
             lines.append("")
-            lines.append(boldSerifMetric("\(mostBlockedCount)x"))
-            lines.append("\(mostBlockedAppName) Blocked Today")
+            lines.append(boldSerifMetric("\(mostBlockedCount)X"))
+            lines.append("\(mostBlockedAppName) Blocked")
         }
 
         return lines
@@ -223,6 +281,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let tokenKey = application.token
             .flatMap { try? PropertyListEncoder().encode($0) }
             .map { "app:" + $0.base64EncodedString() }
+        recordKnownAppName(name, for: tokenKey)
         return createShieldConfiguration(for: name, tokenKey: tokenKey)
     }
 
@@ -234,6 +293,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let tokenKey = application.token
             .flatMap { try? PropertyListEncoder().encode($0) }
             .map { "app:" + $0.base64EncodedString() }
+        recordKnownAppName(name, for: tokenKey)
         return createShieldConfiguration(for: name, tokenKey: tokenKey)
     }
 
@@ -242,6 +302,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let tokenKey = webDomain.token
             .flatMap { try? PropertyListEncoder().encode($0) }
             .map { "web:" + $0.base64EncodedString() }
+        recordKnownAppName(domain, for: tokenKey)
         return createShieldConfiguration(for: domain, tokenKey: tokenKey)
     }
 
@@ -253,6 +314,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let tokenKey = webDomain.token
             .flatMap { try? PropertyListEncoder().encode($0) }
             .map { "web:" + $0.base64EncodedString() }
+        recordKnownAppName(domain, for: tokenKey)
         return createShieldConfiguration(for: domain, tokenKey: tokenKey)
     }
 }
