@@ -410,6 +410,11 @@ class LiveAnchorSnapshot {
   final int focusedMinutes;
   final int pickupsSaved;
   final int focusScore;
+  final bool isSavingTime;
+  final int projectedDiffMinutes;
+  final String projectedTimeText;
+  final String projectedLabel;
+  final String shieldDiffFormatted;
 
   const LiveAnchorSnapshot({
     this.activeRule,
@@ -424,5 +429,10 @@ class LiveAnchorSnapshot {
     required this.focusedMinutes,
     this.pickupsSaved = 0,
     required this.focusScore,
+    this.isSavingTime = true,
+    this.projectedDiffMinutes = 65,
+    this.projectedTimeText = '1h 05m',
+    this.projectedLabel = 'On Track to Save',
+    this.shieldDiffFormatted = '↓ 1h 05m',
   });
 }

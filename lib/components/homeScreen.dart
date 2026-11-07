@@ -119,9 +119,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       rules: _rules,
       isOnMindfulBreak: _isOnMindfulBreak,
       sessionRemaining: sessionRemaining,
-      protectedToday: snapshot.focusedDuration,
+      protectedToday: snapshot.shieldDiffFormatted,
       screenTimeToday: screenTimeToday,
       scheduleTitle: snapshot.title,
+      projectedTimeText: snapshot.projectedTimeText,
+      projectedLabel: snapshot.isSavingTime
+          ? 'On Track to Save vs Yesterday'
+          : 'Projected Over Yesterday',
+      isSavingTime: snapshot.isSavingTime,
     );
 
     await ScheduleService.syncDailyStats(
@@ -427,7 +432,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ? ScheduleRuleModel.formatDurationMinutes(
                     snapshot.activeRule!.currentCycleRemainingMinutes)
                 : '0m',
-            protectedToday: snapshot.focusedDuration,
+            protectedToday: snapshot.projectedTimeText,
+            isSavingTime: snapshot.isSavingTime,
+            projectedTimeText: snapshot.projectedTimeText,
+            projectedLabel: snapshot.projectedLabel,
             screenTimeToday: (_screenTimeSnapshot?.totalMinutes != null &&
                     _screenTimeSnapshot!.totalMinutes! > 0)
                 ? ScheduleRuleModel.formatDurationMinutes(

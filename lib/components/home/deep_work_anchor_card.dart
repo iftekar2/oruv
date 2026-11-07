@@ -14,6 +14,9 @@ class DeepWorkAnchorCard extends StatelessWidget {
   final String? sessionRemaining;
   final String? protectedToday;
   final String? screenTimeToday;
+  final bool isSavingTime;
+  final String? projectedTimeText;
+  final String? projectedLabel;
   final bool isOnBreak;
   final int breakRemainingSeconds;
   final int breakTotalSeconds;
@@ -33,6 +36,9 @@ class DeepWorkAnchorCard extends StatelessWidget {
     this.sessionRemaining,
     this.protectedToday,
     this.screenTimeToday,
+    this.isSavingTime = true,
+    this.projectedTimeText,
+    this.projectedLabel,
     this.isOnBreak = false,
     this.breakRemainingSeconds = 0,
     this.breakTotalSeconds = 0,
@@ -41,6 +47,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
   });
 
   static const Color _accentGreen = Color(0xFF1D6F58);
+  static const Color _coralRed = Color(0xFFD94841);
   static const Color _primaryText = Color(0xFF1B1B1D);
   static const Color _mutedText = Color(0xFF6E6A6E);
   static const Color _cardBorder = Color(0xFFECE8E4);
@@ -64,10 +71,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: _cardBorder,
-          width: 1.2,
-        ),
+        border: Border.all(color: _cardBorder, width: 1.2),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -172,9 +176,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
                   width: 7,
                   height: 7,
                   decoration: BoxDecoration(
-                    color: isOnBreak
-                        ? const Color(0xFFF59E0B)
-                        : _accentGreen,
+                    color: isOnBreak ? const Color(0xFFF59E0B) : _accentGreen,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -196,14 +198,10 @@ class DeepWorkAnchorCard extends StatelessWidget {
           ),
 
           const SizedBox(height: 18),
-          const Divider(
-            color: Color(0xFFF1EDE9),
-            height: 1,
-            thickness: 1,
-          ),
+          const Divider(color: Color(0xFFF1EDE9), height: 1, thickness: 1),
           const SizedBox(height: 18),
 
-          // 3-Column Metrics Row: Session Remaining, Protected Today, Screen Time Today
+          // 3-Column Metrics Row: Session Remaining, Projected Time Saved / Over vs Yesterday, Screen Time Today
           Row(
             children: [
               Expanded(
@@ -213,23 +211,25 @@ class DeepWorkAnchorCard extends StatelessWidget {
                   valueColor: _primaryText,
                 ),
               ),
-              Container(
-                width: 1,
-                height: 38,
-                color: const Color(0xFFEEEAE6),
-              ),
+              Container(width: 1, height: 38, color: const Color(0xFFEEEAE6)),
               Expanded(
                 child: _buildMetricColumn(
-                  value: protectedToday ?? focusedDuration,
-                  label: 'Protected Today',
-                  valueColor: _accentGreen,
+                  value:
+                      projectedTimeText ?? (protectedToday ?? focusedDuration),
+                  label:
+                      projectedLabel ??
+                      (isSavingTime ? 'On Track to Save' : 'Projected Over'),
+                  valueColor: isSavingTime ? _accentGreen : _coralRed,
+                  prefixIcon: Icon(
+                    isSavingTime
+                        ? Icons.arrow_drop_down_sharp
+                        : Icons.arrow_drop_up_sharp,
+                    size: 16,
+                    color: isSavingTime ? _accentGreen : _coralRed,
+                  ),
                 ),
               ),
-              Container(
-                width: 1,
-                height: 38,
-                color: const Color(0xFFEEEAE6),
-              ),
+              Container(width: 1, height: 38, color: const Color(0xFFEEEAE6)),
               Expanded(
                 child: _buildMetricColumn(
                   value: screenTimeToday ?? '0m',
@@ -293,10 +293,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: _primaryText,
-                side: const BorderSide(
-                  color: _cardBorder,
-                  width: 1.2,
-                ),
+                side: const BorderSide(color: _cardBorder, width: 1.2),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(28),
                 ),
@@ -304,11 +301,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.tune_rounded,
-                    size: 18,
-                    color: _primaryText,
-                  ),
+                  const Icon(Icons.tune_rounded, size: 18, color: _primaryText),
                   const SizedBox(width: 8),
                   Text(
                     'Adjust',
@@ -331,20 +324,31 @@ class DeepWorkAnchorCard extends StatelessWidget {
     required String value,
     required String label,
     required Color valueColor,
+    Widget? prefixIcon,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          value,
-          style: GoogleFonts.lora(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: valueColor,
-            letterSpacing: -0.2,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (prefixIcon != null) ...[prefixIcon, const SizedBox(width: 2)],
+            Flexible(
+              child: Text(
+                value,
+                style: GoogleFonts.lora(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: valueColor,
+                  letterSpacing: -0.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 5),
         Text(
@@ -414,4 +418,3 @@ class _AnchorProgressRingPainter extends CustomPainter {
         oldDelegate.trackColor != trackColor;
   }
 }
-

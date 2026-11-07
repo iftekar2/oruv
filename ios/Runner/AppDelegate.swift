@@ -717,6 +717,15 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
             if let scheduleTitle = args?["scheduleTitle"] as? String {
               sharedDefaults?.set(scheduleTitle, forKey: "oruv_schedule_title")
             }
+            if let projectedTimeText = args?["projectedTimeText"] as? String {
+              sharedDefaults?.set(projectedTimeText, forKey: "oruv_projected_time")
+            }
+            if let projectedLabel = args?["projectedLabel"] as? String {
+              sharedDefaults?.set(projectedLabel, forKey: "oruv_projected_label")
+            }
+            if let isSavingTime = args?["isSavingTime"] as? Bool {
+              sharedDefaults?.set(isSavingTime, forKey: "oruv_is_saving_time")
+            }
             ScreenTimeManager.shared.syncShield(shouldBlock: shouldBlock)
             result(true)
           default:

@@ -51,7 +51,9 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     /// Builds a vertical column layout for the metrics without any divider bars.
     private func buildMetricsSection(
         sessionRemaining: String?,
-        protectedToday: String
+        projectedTime: String,
+        projectedLabel: String,
+        isSavingTime: Bool
     ) -> [String] {
         var lines: [String] = []
 
@@ -62,8 +64,9 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             lines.append("")
         }
 
-        lines.append(boldSerifMetric(protectedToday))
-        lines.append("Protected Today")
+        let arrow = isSavingTime ? "↓\u{00A0}" : "↑\u{00A0}"
+        lines.append(arrow + boldSerifMetric(projectedTime))
+        lines.append(projectedLabel)
 
         return lines
     }
@@ -72,7 +75,13 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         // Fetch saved metrics from App Group UserDefaults
         let rawSession = sharedDefaults?.string(forKey: "oruv_session_remaining")?.trimmingCharacters(in: .whitespacesAndNewlines)
         let sessionRemaining = (rawSession?.isEmpty == false) ? rawSession : "2h 15m"
-        let protectedToday = sharedDefaults?.string(forKey: "oruv_protected_today") ?? "4h 12m"
+        
+        let projectedTime = sharedDefaults?.string(forKey: "oruv_projected_time")
+            ?? sharedDefaults?.string(forKey: "oruv_protected_today")
+            ?? "1h 05m"
+        let isSavingTime = sharedDefaults?.object(forKey: "oruv_is_saving_time") as? Bool ?? true
+        let defaultLabel = isSavingTime ? "On Track to Save vs Yesterday" : "Projected Over Yesterday"
+        let projectedLabel = sharedDefaults?.string(forKey: "oruv_projected_label") ?? defaultLabel
 
         var subtitleLines: [String] = [
             "\(entityName) is blocked by Oruv to protect your focus.",
@@ -81,7 +90,9 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         subtitleLines.append(
             contentsOf: buildMetricsSection(
                 sessionRemaining: sessionRemaining,
-                protectedToday: protectedToday
+                projectedTime: projectedTime,
+                projectedLabel: projectedLabel,
+                isSavingTime: isSavingTime
             )
         )
 
