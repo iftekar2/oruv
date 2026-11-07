@@ -711,6 +711,9 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
             if let protectedToday = args?["protectedToday"] as? String {
               sharedDefaults?.set(protectedToday, forKey: "oruv_protected_today")
             }
+            if let screenTimeToday = args?["screenTimeToday"] as? String {
+              sharedDefaults?.set(screenTimeToday, forKey: "oruv_screen_time_today")
+            }
             if let scheduleTitle = args?["scheduleTitle"] as? String {
               sharedDefaults?.set(scheduleTitle, forKey: "oruv_schedule_title")
             }

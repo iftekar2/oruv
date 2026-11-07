@@ -11,6 +11,9 @@ class DeepWorkAnchorCard extends StatelessWidget {
   final double progress;
   final String focusedDuration;
   final int focusScore;
+  final String? sessionRemaining;
+  final String? protectedToday;
+  final String? screenTimeToday;
   final bool isOnBreak;
   final int breakRemainingSeconds;
   final int breakTotalSeconds;
@@ -27,6 +30,9 @@ class DeepWorkAnchorCard extends StatelessWidget {
     this.progress = 0.72,
     this.focusedDuration = '1h 45m',
     this.focusScore = 88,
+    this.sessionRemaining,
+    this.protectedToday,
+    this.screenTimeToday,
     this.isOnBreak = false,
     this.breakRemainingSeconds = 0,
     this.breakTotalSeconds = 0,
@@ -197,26 +203,38 @@ class DeepWorkAnchorCard extends StatelessWidget {
           ),
           const SizedBox(height: 18),
 
-          // 2-Column Metrics Row: Focused & Focus Score
+          // 3-Column Metrics Row: Session Remaining, Protected Today, Screen Time Today
           Row(
             children: [
               Expanded(
                 child: _buildMetricColumn(
-                  value: focusedDuration,
-                  label: 'Focused',
+                  value: sessionRemaining ?? '0m',
+                  label: 'Session Remaining',
                   valueColor: _primaryText,
                 ),
               ),
               Container(
                 width: 1,
-                height: 36,
+                height: 38,
                 color: const Color(0xFFEEEAE6),
               ),
               Expanded(
                 child: _buildMetricColumn(
-                  value: '$focusScore',
-                  label: 'Focus Score',
+                  value: protectedToday ?? focusedDuration,
+                  label: 'Protected Today',
                   valueColor: _accentGreen,
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 38,
+                color: const Color(0xFFEEEAE6),
+              ),
+              Expanded(
+                child: _buildMetricColumn(
+                  value: screenTimeToday ?? '0m',
+                  label: 'Screen Time Today',
+                  valueColor: _primaryText,
                 ),
               ),
             ],
@@ -320,19 +338,26 @@ class DeepWorkAnchorCard extends StatelessWidget {
         Text(
           value,
           style: GoogleFonts.lora(
-            fontSize: 21,
+            fontSize: 20,
             fontWeight: FontWeight.w700,
             color: valueColor,
+            letterSpacing: -0.2,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         Text(
           label,
           style: GoogleFonts.lora(
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: FontWeight.w400,
             color: _mutedText,
+            height: 1.2,
           ),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );

@@ -103,7 +103,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final sessionRemaining = snapshot.activeRule != null
         ? ScheduleRuleModel.formatDurationMinutes(
-            snapshot.activeRule!.currentCycleRemainingMinutes)
+            snapshot.activeRule!.currentCycleRemainingMinutes,
+          )
+        : null;
+
+    final screenTimeToday =
+        (_screenTimeSnapshot?.totalMinutes != null &&
+            _screenTimeSnapshot!.totalMinutes! > 0)
+        ? ScheduleRuleModel.formatDurationMinutes(
+            _screenTimeSnapshot!.totalMinutes!,
+          )
         : null;
 
     await ScheduleService.syncNativeShield(
@@ -111,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       isOnMindfulBreak: _isOnMindfulBreak,
       sessionRemaining: sessionRemaining,
       protectedToday: snapshot.focusedDuration,
+      screenTimeToday: screenTimeToday,
       scheduleTitle: snapshot.title,
     );
 
@@ -167,8 +177,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onStartBreakMinutes: (minutes) {
           _mindfulBreakTimer?.cancel();
           final totalSec = minutes * 60;
-          final targetEndTime =
-              DateTime.now().add(Duration(seconds: totalSec));
+          final targetEndTime = DateTime.now().add(Duration(seconds: totalSec));
 
           setState(() {
             _isOnMindfulBreak = true;
@@ -179,52 +188,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           });
           _syncShieldAndStats();
 
-          _mindfulBreakTimer = Timer.periodic(
-            const Duration(seconds: 1),
-            (timer) {
-              if (!mounted) {
-                timer.cancel();
-                return;
-              }
-              final now = DateTime.now();
-              final remaining = _breakEndTime != null
-                  ? _breakEndTime!.difference(now).inSeconds
-                  : _mindfulBreakRemainingSeconds - 1;
+          _mindfulBreakTimer = Timer.periodic(const Duration(seconds: 1), (
+            timer,
+          ) {
+            if (!mounted) {
+              timer.cancel();
+              return;
+            }
+            final now = DateTime.now();
+            final remaining = _breakEndTime != null
+                ? _breakEndTime!.difference(now).inSeconds
+                : _mindfulBreakRemainingSeconds - 1;
 
-              if (remaining <= 0) {
-                timer.cancel();
-                setState(() {
-                  _isOnMindfulBreak = false;
-                  _mindfulBreakRemainingSeconds = 0;
-                  _mindfulBreakTotalSeconds = 0;
-                  _breakEndTime = null;
-                });
-                _syncShieldAndStats();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Mindful break ended \u2013 Focus mode and shields automatically restarted!',
-                      ),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: Color(0xFF1D6F58),
-                      duration: Duration(seconds: 4),
+            if (remaining <= 0) {
+              timer.cancel();
+              setState(() {
+                _isOnMindfulBreak = false;
+                _mindfulBreakRemainingSeconds = 0;
+                _mindfulBreakTotalSeconds = 0;
+                _breakEndTime = null;
+              });
+              _syncShieldAndStats();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Mindful break ended \u2013 Focus mode and shields automatically restarted!',
                     ),
-                  );
-                }
-              } else {
-                setState(() {
-                  _mindfulBreakRemainingSeconds = remaining;
-                });
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: Color(0xFF1D6F58),
+                    duration: Duration(seconds: 4),
+                  ),
+                );
               }
-            },
-          );
+            } else {
+              setState(() {
+                _mindfulBreakRemainingSeconds = remaining;
+              });
+            }
+          });
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                'Mindful break started for $minutes minutes',
-              ),
+              content: Text('Mindful break started for $minutes minutes'),
               behavior: SnackBarBehavior.floating,
               backgroundColor: const Color(0xFF1D6F58),
             ),
@@ -236,7 +242,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _handleAdjustAnchor(LiveAnchorSnapshot snapshot) {
     final targetRule =
-        snapshot.activeRule ?? snapshot.nextRule ?? (_rules.isNotEmpty ? _rules.first : null);
+        snapshot.activeRule ??
+        snapshot.nextRule ??
+        (_rules.isNotEmpty ? _rules.first : null);
 
     final initialStart = targetRule?.startTime ?? '9:00 AM';
     final initialEnd = targetRule?.endTime ?? '5:00 PM';
@@ -368,9 +376,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         bottom: false,
         child: _isLoadingSchedules
             ? const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF1D6F58),
-                ),
+                child: CircularProgressIndicator(color: Color(0xFF1D6F58)),
               )
             : _buildActiveTabBody(snapshot),
       ),
@@ -417,6 +423,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             scheduleEnd: snapshot.scheduleEnd,
             remainingCycleText: snapshot.remainingCycleText,
             progress: snapshot.progress,
+            sessionRemaining: snapshot.activeRule != null
+                ? ScheduleRuleModel.formatDurationMinutes(
+                    snapshot.activeRule!.currentCycleRemainingMinutes)
+                : '0m',
+            protectedToday: snapshot.focusedDuration,
+            screenTimeToday: (_screenTimeSnapshot?.totalMinutes != null &&
+                    _screenTimeSnapshot!.totalMinutes! > 0)
+                ? ScheduleRuleModel.formatDurationMinutes(
+                    _screenTimeSnapshot!.totalMinutes!)
+                : '0m',
             focusedDuration: snapshot.focusedDuration,
             focusScore: snapshot.focusScore,
             isOnBreak: _isOnMindfulBreak,
