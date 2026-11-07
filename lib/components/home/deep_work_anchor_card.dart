@@ -17,6 +17,8 @@ class DeepWorkAnchorCard extends StatelessWidget {
   final bool isSavingTime;
   final String? projectedTimeText;
   final String? projectedLabel;
+  final String mostBlockedAppName;
+  final int mostBlockedAppCount;
   final bool isOnBreak;
   final int breakRemainingSeconds;
   final int breakTotalSeconds;
@@ -39,6 +41,8 @@ class DeepWorkAnchorCard extends StatelessWidget {
     this.isSavingTime = true,
     this.projectedTimeText,
     this.projectedLabel,
+    this.mostBlockedAppName = '',
+    this.mostBlockedAppCount = 0,
     this.isOnBreak = false,
     this.breakRemainingSeconds = 0,
     this.breakTotalSeconds = 0,
@@ -232,8 +236,12 @@ class DeepWorkAnchorCard extends StatelessWidget {
               Container(width: 1, height: 38, color: const Color(0xFFEEEAE6)),
               Expanded(
                 child: _buildMetricColumn(
-                  value: screenTimeToday ?? '0m',
-                  label: 'Screen Time Today',
+                  value: mostBlockedAppCount > 0
+                      ? '${mostBlockedAppCount}x'
+                      : '0',
+                  label: mostBlockedAppCount > 0
+                      ? '$mostBlockedAppName Blocked'
+                      : 'Urges Blocked',
                   valueColor: _primaryText,
                 ),
               ),
@@ -360,7 +368,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
             height: 1.2,
           ),
           textAlign: TextAlign.center,
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
       ],

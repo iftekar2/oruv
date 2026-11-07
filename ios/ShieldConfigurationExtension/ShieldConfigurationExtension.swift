@@ -48,12 +48,80 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return text.map { map[$0] ?? String($0) }.joined()
     }
 
+    /// Records a genuine blocked open attempt with debounce to prevent duplicate layout / background snapshot calls.
+    private func recordBlockedAttempt(for entityName: String) -> (appName: String, count: Int) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let todayStr = formatter.string(from: Date())
+
+        let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)
+        let fileURL = containerURL?.appendingPathComponent("blocked_attempts.json")
+
+        // 1. Read existing attempts from shared JSON file or UserDefaults
+        var attempts: [String: Int] = [:]
+        var lastOpenTimestamps: [String: Double] = (sharedDefaults?.dictionary(forKey: "oruv_last_open_timestamps") as? [String: Double]) ?? [:]
+
+        if let fileURL = fileURL,
+           let data = try? Data(contentsOf: fileURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           (json["date"] as? String) == todayStr,
+           let fileAttempts = json["attempts"] as? [String: Int] {
+            attempts = fileAttempts
+        } else {
+            let savedDate = sharedDefaults?.string(forKey: "oruv_blocked_attempts_date")
+            if savedDate == todayStr {
+                attempts = (sharedDefaults?.dictionary(forKey: "oruv_blocked_attempts_today") as? [String: Int]) ?? [:]
+            }
+        }
+
+        // 2. Debounce: Only increment if at least 3.5 seconds have passed since this app was last shielded.
+        // This eliminates duplicate system layout calls and background snapshotting.
+        let now = Date().timeIntervalSince1970
+        let lastOpen = lastOpenTimestamps[entityName] ?? 0
+        if (now - lastOpen) >= 3.5 {
+            attempts[entityName, default: 0] += 1
+            lastOpenTimestamps[entityName] = now
+            sharedDefaults?.set(lastOpenTimestamps, forKey: "oruv_last_open_timestamps")
+        }
+
+        let mostBlocked = attempts.max(by: { $0.value < $1.value })
+        let topApp = mostBlocked?.key ?? entityName
+        let topCount = mostBlocked?.value ?? attempts[entityName] ?? 1
+        let total = attempts.values.reduce(0, +)
+
+        // 3. Save to shared file in App Group (guaranteed immediate cross-process visibility)
+        if let fileURL = fileURL {
+            let jsonPayload: [String: Any] = [
+                "date": todayStr,
+                "attempts": attempts,
+                "mostBlockedAppName": topApp,
+                "mostBlockedCount": topCount,
+                "total": total
+            ]
+            if let data = try? JSONSerialization.data(withJSONObject: jsonPayload, options: []) {
+                try? data.write(to: fileURL, options: .atomic)
+            }
+        }
+
+        // 4. Save to UserDefaults as well with explicit synchronize
+        sharedDefaults?.set(todayStr, forKey: "oruv_blocked_attempts_date")
+        sharedDefaults?.set(attempts, forKey: "oruv_blocked_attempts_today")
+        sharedDefaults?.set(topApp, forKey: "oruv_most_blocked_app_name")
+        sharedDefaults?.set(topCount, forKey: "oruv_most_blocked_app_count")
+        sharedDefaults?.set(total, forKey: "oruv_total_blocked_today")
+        sharedDefaults?.synchronize()
+
+        return (topApp, topCount)
+    }
+
     /// Builds a vertical column layout for the metrics without any divider bars.
     private func buildMetricsSection(
         sessionRemaining: String?,
         projectedTime: String,
         projectedLabel: String,
-        isSavingTime: Bool
+        isSavingTime: Bool,
+        mostBlockedAppName: String,
+        mostBlockedCount: Int
     ) -> [String] {
         var lines: [String] = []
 
@@ -68,10 +136,19 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         lines.append(arrow + boldSerifMetric(projectedTime))
         lines.append(projectedLabel)
 
+        if mostBlockedCount > 0 {
+            lines.append("")
+            lines.append(boldSerifMetric("\(mostBlockedCount)x"))
+            lines.append("\(mostBlockedAppName) Blocked Today")
+        }
+
         return lines
     }
 
     private func createShieldConfiguration(for entityName: String) -> ShieldConfiguration {
+        // Record blocked attempt for this app and get the most frequently blocked app
+        let attempt = recordBlockedAttempt(for: entityName)
+
         // Fetch saved metrics from App Group UserDefaults
         let rawSession = sharedDefaults?.string(forKey: "oruv_session_remaining")?.trimmingCharacters(in: .whitespacesAndNewlines)
         let sessionRemaining = (rawSession?.isEmpty == false) ? rawSession : "2h 15m"
@@ -92,7 +169,9 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
                 sessionRemaining: sessionRemaining,
                 projectedTime: projectedTime,
                 projectedLabel: projectedLabel,
-                isSavingTime: isSavingTime
+                isSavingTime: isSavingTime,
+                mostBlockedAppName: attempt.appName,
+                mostBlockedCount: attempt.count
             )
         )
 

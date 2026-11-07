@@ -111,6 +111,26 @@ class ScreenTimeService {
     }
   }
 
+  /// Queries native iOS Shield attempts for the most frequently blocked app today.
+  static Future<Map<String, dynamic>> fetchBlockedAttempts() async {
+    if (!Platform.isIOS) return {};
+    try {
+      final res =
+          await _channel.invokeMapMethod<String, dynamic>('getBlockedAttempts');
+      return res ?? {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Resets recorded blocked attempts for testing.
+  static Future<void> resetBlockedAttempts() async {
+    if (!Platform.isIOS) return;
+    try {
+      await _channel.invokeMethod('resetBlockedAttempts');
+    } catch (_) {}
+  }
+
   /// Requests Screen Time (iOS) or Usage Access (Android) permission.
   static Future<bool> requestAuthorization() async {
     if (!Platform.isIOS && !Platform.isAndroid) return false;

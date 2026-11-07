@@ -37,6 +37,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<ScheduleRuleModel> _rules = [];
   bool _isLoadingSchedules = true;
   DailyScreenTimeSnapshot? _screenTimeSnapshot;
+  String _mostBlockedAppName = '';
+  int _mostBlockedAppCount = 0;
 
   @override
   void initState() {
@@ -49,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {});
       _syncShieldAndStats();
+      _refreshBlockedAttempts();
     });
   }
 
@@ -64,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       final loadedRules = await ScheduleService.loadSchedules();
       final screenTime = await ScreenTimeService.fetchDailyScreenTime();
+      await _refreshBlockedAttempts();
       if (!mounted) return;
 
       setState(() {
@@ -92,6 +96,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       });
     } catch (e) {
       debugPrint('HomeScreen._refreshDailyScreenTime note: $e');
+    }
+  }
+
+  Future<void> _refreshBlockedAttempts() async {
+    try {
+      final stats = await ScreenTimeService.fetchBlockedAttempts();
+      if (!mounted) return;
+      setState(() {
+        _mostBlockedAppName = (stats['appName'] as String?) ?? '';
+        _mostBlockedAppCount = (stats['count'] as int?) ?? 0;
+      });
+    } catch (e) {
+      debugPrint('HomeScreen._refreshBlockedAttempts note: $e');
     }
   }
 
@@ -140,6 +157,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Re-query real usage when returning from Settings / other apps.
     if (state == AppLifecycleState.resumed) {
       _refreshDailyScreenTime();
+      _refreshBlockedAttempts();
     }
   }
 
@@ -436,6 +454,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             isSavingTime: snapshot.isSavingTime,
             projectedTimeText: snapshot.projectedTimeText,
             projectedLabel: snapshot.projectedLabel,
+            mostBlockedAppName: _mostBlockedAppName,
+            mostBlockedAppCount: _mostBlockedAppCount,
             screenTimeToday: (_screenTimeSnapshot?.totalMinutes != null &&
                     _screenTimeSnapshot!.totalMinutes! > 0)
                 ? ScheduleRuleModel.formatDurationMinutes(

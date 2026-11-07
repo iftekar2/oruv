@@ -678,6 +678,60 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
             result([
               "authorized": isApproved
             ])
+          case "getBlockedAttempts":
+            let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
+            sharedDefaults?.synchronize()
+
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let todayStr = formatter.string(from: Date())
+
+            // 1. Read from shared App Group JSON file (immediate, zero cross-process lag)
+            if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
+              let fileURL = containerURL.appendingPathComponent("blocked_attempts.json")
+              if let data = try? Data(contentsOf: fileURL),
+                 let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                 (json["date"] as? String) == todayStr {
+                let appName = (json["mostBlockedAppName"] as? String) ?? ""
+                let count = (json["mostBlockedCount"] as? Int) ?? 0
+                let total = (json["total"] as? Int) ?? 0
+                result([
+                  "appName": appName,
+                  "count": count,
+                  "totalAttempts": total
+                ])
+                return
+              }
+            }
+
+            // 2. Fallback to UserDefaults
+            let savedDate = sharedDefaults?.string(forKey: "oruv_blocked_attempts_date")
+            var attempts = (savedDate == todayStr)
+              ? (sharedDefaults?.dictionary(forKey: "oruv_blocked_attempts_today") as? [String: Int] ?? [:])
+              : [:]
+            let mostBlocked = attempts.max(by: { $0.value < $1.value })
+            let appName = mostBlocked?.key ?? sharedDefaults?.string(forKey: "oruv_most_blocked_app_name") ?? ""
+            let count = mostBlocked?.value ?? sharedDefaults?.integer(forKey: "oruv_most_blocked_app_count") ?? 0
+            let total = attempts.values.reduce(0, +)
+
+            result([
+              "appName": appName,
+              "count": count,
+              "totalAttempts": total
+            ])
+          case "resetBlockedAttempts":
+            let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
+            sharedDefaults?.removeObject(forKey: "oruv_blocked_attempts_today")
+            sharedDefaults?.removeObject(forKey: "oruv_most_blocked_app_name")
+            sharedDefaults?.removeObject(forKey: "oruv_most_blocked_app_count")
+            sharedDefaults?.removeObject(forKey: "oruv_total_blocked_today")
+            sharedDefaults?.removeObject(forKey: "oruv_last_open_timestamps")
+            if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
+              let fileURL = containerURL.appendingPathComponent("blocked_attempts.json")
+              try? FileManager.default.removeItem(at: fileURL)
+            }
+            sharedDefaults?.synchronize()
+            result(true)
           case "getDailyScreenTime":
             let isApproved = AuthorizationCenter.shared.authorizationStatus == .approved
             let appsCount = ScreenTimeManager.shared.orderedAppTokens.count
