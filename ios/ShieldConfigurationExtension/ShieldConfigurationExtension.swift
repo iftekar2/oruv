@@ -84,10 +84,6 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
                 tokenNames[key] = name
             }
             json["tokenNames"] = tokenNames
-            let currentTopName = (json["mostBlockedAppName"] as? String) ?? ""
-            if currentTopName.isEmpty {
-                json["mostBlockedAppName"] = name
-            }
             if let updatedData = try? JSONSerialization.data(withJSONObject: json, options: []) {
                 try? updatedData.write(to: fileURL, options: .atomic)
             }
@@ -100,54 +96,12 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             userDefaultsNames[key] = name
         }
         sharedDefaults?.set(userDefaultsNames, forKey: "oruv_blocked_token_names")
-        if (sharedDefaults?.string(forKey: "oruv_most_blocked_app_name") ?? "").isEmpty {
-            sharedDefaults?.set(name, forKey: "oruv_most_blocked_app_name")
-        }
         sharedDefaults?.synchronize()
     }
 
-    /// Resolves the localized display name for a stored token key inside ShieldConfigurationExtension.
-    private func resolveDisplayName(
-        for tokenKey: String,
-        savedNames: [String: String],
-        fallback: String
-    ) -> String {
-        if let saved = savedNames[tokenKey], !saved.isEmpty {
-            return saved
-        }
-        if tokenKey.hasPrefix("app:") {
-            let base64 = String(tokenKey.dropFirst(4))
-            if let data = Data(base64Encoded: base64),
-               let token = try? PropertyListDecoder().decode(ApplicationToken.self, from: data),
-               let name = Application(token: token).localizedDisplayName,
-               !name.isEmpty {
-                return name
-            }
-        } else if tokenKey.hasPrefix("cat:") {
-            let base64 = String(tokenKey.dropFirst(4))
-            if let data = Data(base64Encoded: base64),
-               let token = try? PropertyListDecoder().decode(ActivityCategoryToken.self, from: data),
-               let name = ActivityCategory(token: token).localizedDisplayName,
-               !name.isEmpty {
-                return name
-            }
-        } else if tokenKey.hasPrefix("web:") {
-            let base64 = String(tokenKey.dropFirst(4))
-            if let data = Data(base64Encoded: base64),
-               let token = try? PropertyListDecoder().decode(WebDomainToken.self, from: data),
-               let domain = WebDomain(token: token).domain,
-               !domain.isEmpty {
-                return domain
-            }
-        } else if tokenKey.hasPrefix("name:") {
-            return String(tokenKey.dropFirst(5))
-        }
-        return fallback
-    }
-
     /// Reads confirmed blocked attempts written by `ShieldActionExtension` in the shared App Group,
-    /// includes +1 for the current active shield presentation, and resolves the most-blocked app.
-    private func resolveMostBlockedAttempt(
+    /// and returns the blocked count for THIS specific app (+1 for the active shield presentation).
+    private func resolveThisAppBlockedCount(
         for entityName: String,
         tokenKey: String?
     ) -> (appName: String, count: Int) {
@@ -161,33 +115,24 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let fileURL = containerURL?.appendingPathComponent("blocked_attempts.json")
 
         var tokenCounts: [String: Int] = [:]
-        var tokenNames: [String: String] = [:]
 
         if let fileURL = fileURL,
            let data = try? Data(contentsOf: fileURL),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            (json["date"] as? String) == todayStr {
             tokenCounts = (json["tokenCounts"] as? [String: Int]) ?? [:]
-            tokenNames = (json["tokenNames"] as? [String: String]) ?? [:]
         } else if sharedDefaults?.string(forKey: "oruv_blocked_attempts_date") == todayStr {
             tokenCounts = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_counts") as? [String: Int]) ?? [:]
-            tokenNames = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_names") as? [String: String]) ?? [:]
         }
 
         let currentKey = tokenKey ?? "name:\(entityName)"
-        // Add +1 for the shield presentation currently on screen (which ShieldActionExtension
-        // will persist when the user taps "Got It").
-        tokenCounts[currentKey, default: 0] += 1
-        tokenNames[currentKey] = entityName
+        let confirmedCount = tokenCounts[currentKey]
+            ?? (tokenKey != nil ? tokenCounts["name:\(entityName)"] : nil)
+            ?? 0
+        // Add +1 for the shield presentation currently on screen
+        let count = confirmedCount + 1
 
-        let mostBlocked = tokenCounts.max(by: { $0.value < $1.value })
-        let topKey = mostBlocked?.key ?? currentKey
-        let topCount = mostBlocked?.value ?? 1
-        let topAppName = (topKey == currentKey)
-            ? entityName
-            : resolveDisplayName(for: topKey, savedNames: tokenNames, fallback: entityName)
-
-        return (topAppName, topCount)
+        return (entityName, count)
     }
 
     /// Builds a vertical column layout for the metrics without any divider bars.
@@ -196,8 +141,8 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         projectedTime: String,
         projectedLabel: String,
         isSavingTime: Bool,
-        mostBlockedAppName: String,
-        mostBlockedCount: Int
+        blockedAppName: String,
+        blockedCount: Int
     ) -> [String] {
         var lines: [String] = []
 
@@ -212,10 +157,10 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         lines.append(arrow + boldSerifMetric(projectedTime))
         lines.append(projectedLabel)
 
-        if mostBlockedCount > 0 {
+        if blockedCount > 0 {
             lines.append("")
-            lines.append(boldSerifMetric("\(mostBlockedCount)X"))
-            lines.append("\(mostBlockedAppName) Blocked")
+            lines.append(boldSerifMetric("\(blockedCount)X"))
+            lines.append("\(blockedAppName) Blocked")
         }
 
         return lines
@@ -225,7 +170,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         for entityName: String,
         tokenKey: String?
     ) -> ShieldConfiguration {
-        let attempt = resolveMostBlockedAttempt(for: entityName, tokenKey: tokenKey)
+        let attempt = resolveThisAppBlockedCount(for: entityName, tokenKey: tokenKey)
 
         // Fetch saved metrics from App Group UserDefaults
         let rawSession = sharedDefaults?.string(forKey: "oruv_session_remaining")?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -248,8 +193,8 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
                 projectedTime: projectedTime,
                 projectedLabel: projectedLabel,
                 isSavingTime: isSavingTime,
-                mostBlockedAppName: attempt.appName,
-                mostBlockedCount: attempt.count
+                blockedAppName: attempt.appName,
+                blockedCount: attempt.count
             )
         )
 

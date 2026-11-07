@@ -1160,7 +1160,6 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
             if appName.isEmpty {
               let savedTokenNames = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_names") as? [String: String]) ?? [:]
               appName = savedTokenNames[topTokenKey]
-                ?? sharedDefaults?.string(forKey: "oruv_last_shielded_app_name")
                 ?? sharedDefaults?.string(forKey: "oruv_most_blocked_app_name")
                 ?? ""
             }
@@ -1202,9 +1201,12 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
             sharedDefaults?.removeObject(forKey: "oruv_most_blocked_app_count")
             sharedDefaults?.removeObject(forKey: "oruv_total_blocked_today")
             sharedDefaults?.removeObject(forKey: "oruv_last_open_timestamps")
+            sharedDefaults?.removeObject(forKey: "oruv_last_shielded_app_name")
             if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
               let fileURL = containerURL.appendingPathComponent("blocked_attempts.json")
               try? FileManager.default.removeItem(at: fileURL)
+              let namesURL = containerURL.appendingPathComponent("app_names.json")
+              try? FileManager.default.removeItem(at: namesURL)
             }
             sharedDefaults?.synchronize()
             ScreenTimeManager.shared.mostBlockedAppToken = nil

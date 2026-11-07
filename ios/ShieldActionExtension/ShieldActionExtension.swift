@@ -91,11 +91,18 @@ class ShieldActionExtension: ShieldActionDelegate {
         let mostBlocked = tokenCounts.max(by: { $0.value < $1.value })
         let topTokenKey = mostBlocked?.key ?? tokenKey
         let topCount = mostBlocked?.value ?? tokenCounts[tokenKey] ?? 1
-        let topName = tokenNames[topTokenKey]
-            ?? effectiveName
-            ?? resolveName(for: topTokenKey)
-            ?? sharedDefaults?.string(forKey: "oruv_last_shielded_app_name")
-            ?? ""
+        let topName: String = {
+            if let name = tokenNames[topTokenKey], !name.isEmpty {
+                return name
+            }
+            if let resolved = resolveName(for: topTokenKey), !resolved.isEmpty {
+                return resolved
+            }
+            if topTokenKey == tokenKey, let name = effectiveName, !name.isEmpty {
+                return name
+            }
+            return ""
+        }()
         let total = tokenCounts.values.reduce(0, +)
 
         if let fileURL = fileURL {
