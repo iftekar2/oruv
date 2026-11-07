@@ -48,11 +48,10 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return text.map { map[$0] ?? String($0) }.joined()
     }
 
-    /// Builds a vertical column layout for the three metrics without any divider bars.
+    /// Builds a vertical column layout for the metrics without any divider bars.
     private func buildMetricsSection(
         sessionRemaining: String?,
-        protectedToday: String,
-        screenTimeToday: String
+        protectedToday: String
     ) -> [String] {
         var lines: [String] = []
 
@@ -65,10 +64,6 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
         lines.append(boldSerifMetric(protectedToday))
         lines.append("Protected Today")
-        lines.append("")
-
-        lines.append(boldSerifMetric(screenTimeToday))
-        lines.append("Screen Time Today")
 
         return lines
     }
@@ -79,13 +74,6 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let sessionRemaining = (rawSession?.isEmpty == false) ? rawSession : "2h 15m"
         let protectedToday = sharedDefaults?.string(forKey: "oruv_protected_today") ?? "4h 12m"
 
-        let screenTimeStr: String
-        if let totalMinutes = sharedDefaults?.object(forKey: "oruv_daily_total_minutes") as? Int, totalMinutes > 0 {
-            screenTimeStr = formatMinutes(totalMinutes)
-        } else {
-            screenTimeStr = sharedDefaults?.string(forKey: "oruv_screen_time_today") ?? "1h 45m"
-        }
-
         var subtitleLines: [String] = [
             "\(entityName) is blocked by Oruv to protect your focus.",
             ""
@@ -93,8 +81,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         subtitleLines.append(
             contentsOf: buildMetricsSection(
                 sessionRemaining: sessionRemaining,
-                protectedToday: protectedToday,
-                screenTimeToday: screenTimeStr
+                protectedToday: protectedToday
             )
         )
 
@@ -103,7 +90,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return ShieldConfiguration(
             // Force a light blur style so iOS Dark Mode doesn't turn the shield dark gray behind dark text
             backgroundBlurStyle: .systemUltraThinMaterialLight,
-            backgroundColor: UIColor(red: 0.984, green: 0.969, blue: 0.957, alpha: 0.96), // Warm cream #FBF7F4
+            backgroundColor: .white,
             icon: appLogoImage,
             title: ShieldConfiguration.Label(
                 text: "Oruv Focus Shield",
