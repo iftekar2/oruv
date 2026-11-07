@@ -48,70 +48,88 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return text.map { map[$0] ?? String($0) }.joined()
     }
 
-    /// Records a genuine blocked open attempt with debounce to prevent duplicate layout / background snapshot calls.
-    private func recordBlockedAttempt(for entityName: String) -> (appName: String, count: Int) {
+    /// Resolves the localized display name for a stored token key inside ShieldConfigurationExtension.
+    private func resolveDisplayName(
+        for tokenKey: String,
+        savedNames: [String: String],
+        fallback: String
+    ) -> String {
+        if let saved = savedNames[tokenKey], !saved.isEmpty {
+            return saved
+        }
+        if tokenKey.hasPrefix("app:") {
+            let base64 = String(tokenKey.dropFirst(4))
+            if let data = Data(base64Encoded: base64),
+               let token = try? PropertyListDecoder().decode(ApplicationToken.self, from: data),
+               let name = Application(token: token).localizedDisplayName,
+               !name.isEmpty {
+                return name
+            }
+        } else if tokenKey.hasPrefix("cat:") {
+            let base64 = String(tokenKey.dropFirst(4))
+            if let data = Data(base64Encoded: base64),
+               let token = try? PropertyListDecoder().decode(ActivityCategoryToken.self, from: data),
+               let name = ActivityCategory(token: token).localizedDisplayName,
+               !name.isEmpty {
+                return name
+            }
+        } else if tokenKey.hasPrefix("web:") {
+            let base64 = String(tokenKey.dropFirst(4))
+            if let data = Data(base64Encoded: base64),
+               let token = try? PropertyListDecoder().decode(WebDomainToken.self, from: data),
+               let domain = WebDomain(token: token).domain,
+               !domain.isEmpty {
+                return domain
+            }
+        } else if tokenKey.hasPrefix("name:") {
+            return String(tokenKey.dropFirst(5))
+        }
+        return fallback
+    }
+
+    /// Reads confirmed blocked attempts written by `ShieldActionExtension` in the shared App Group,
+    /// includes +1 for the current active shield presentation, and resolves the most-blocked app.
+    private func resolveMostBlockedAttempt(
+        for entityName: String,
+        tokenKey: String?
+    ) -> (appName: String, count: Int) {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let todayStr = formatter.string(from: Date())
 
-        let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)
+        let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupId
+        )
         let fileURL = containerURL?.appendingPathComponent("blocked_attempts.json")
 
-        // 1. Read existing attempts from shared JSON file or UserDefaults
-        var attempts: [String: Int] = [:]
-        var lastOpenTimestamps: [String: Double] = (sharedDefaults?.dictionary(forKey: "oruv_last_open_timestamps") as? [String: Double]) ?? [:]
+        var tokenCounts: [String: Int] = [:]
+        var tokenNames: [String: String] = [:]
 
         if let fileURL = fileURL,
            let data = try? Data(contentsOf: fileURL),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           (json["date"] as? String) == todayStr,
-           let fileAttempts = json["attempts"] as? [String: Int] {
-            attempts = fileAttempts
-        } else {
-            let savedDate = sharedDefaults?.string(forKey: "oruv_blocked_attempts_date")
-            if savedDate == todayStr {
-                attempts = (sharedDefaults?.dictionary(forKey: "oruv_blocked_attempts_today") as? [String: Int]) ?? [:]
-            }
+           (json["date"] as? String) == todayStr {
+            tokenCounts = (json["tokenCounts"] as? [String: Int]) ?? [:]
+            tokenNames = (json["tokenNames"] as? [String: String]) ?? [:]
+        } else if sharedDefaults?.string(forKey: "oruv_blocked_attempts_date") == todayStr {
+            tokenCounts = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_counts") as? [String: Int]) ?? [:]
+            tokenNames = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_names") as? [String: String]) ?? [:]
         }
 
-        // 2. Debounce: Only increment if at least 3.5 seconds have passed since this app was last shielded.
-        // This eliminates duplicate system layout calls and background snapshotting.
-        let now = Date().timeIntervalSince1970
-        let lastOpen = lastOpenTimestamps[entityName] ?? 0
-        if (now - lastOpen) >= 3.5 {
-            attempts[entityName, default: 0] += 1
-            lastOpenTimestamps[entityName] = now
-            sharedDefaults?.set(lastOpenTimestamps, forKey: "oruv_last_open_timestamps")
-        }
+        let currentKey = tokenKey ?? "name:\(entityName)"
+        // Add +1 for the shield presentation currently on screen (which ShieldActionExtension
+        // will persist when the user taps "Got It").
+        tokenCounts[currentKey, default: 0] += 1
+        tokenNames[currentKey] = entityName
 
-        let mostBlocked = attempts.max(by: { $0.value < $1.value })
-        let topApp = mostBlocked?.key ?? entityName
-        let topCount = mostBlocked?.value ?? attempts[entityName] ?? 1
-        let total = attempts.values.reduce(0, +)
+        let mostBlocked = tokenCounts.max(by: { $0.value < $1.value })
+        let topKey = mostBlocked?.key ?? currentKey
+        let topCount = mostBlocked?.value ?? 1
+        let topAppName = (topKey == currentKey)
+            ? entityName
+            : resolveDisplayName(for: topKey, savedNames: tokenNames, fallback: entityName)
 
-        // 3. Save to shared file in App Group (guaranteed immediate cross-process visibility)
-        if let fileURL = fileURL {
-            let jsonPayload: [String: Any] = [
-                "date": todayStr,
-                "attempts": attempts,
-                "mostBlockedAppName": topApp,
-                "mostBlockedCount": topCount,
-                "total": total
-            ]
-            if let data = try? JSONSerialization.data(withJSONObject: jsonPayload, options: []) {
-                try? data.write(to: fileURL, options: .atomic)
-            }
-        }
-
-        // 4. Save to UserDefaults as well with explicit synchronize
-        sharedDefaults?.set(todayStr, forKey: "oruv_blocked_attempts_date")
-        sharedDefaults?.set(attempts, forKey: "oruv_blocked_attempts_today")
-        sharedDefaults?.set(topApp, forKey: "oruv_most_blocked_app_name")
-        sharedDefaults?.set(topCount, forKey: "oruv_most_blocked_app_count")
-        sharedDefaults?.set(total, forKey: "oruv_total_blocked_today")
-        sharedDefaults?.synchronize()
-
-        return (topApp, topCount)
+        return (topAppName, topCount)
     }
 
     /// Builds a vertical column layout for the metrics without any divider bars.
@@ -145,14 +163,16 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return lines
     }
 
-    private func createShieldConfiguration(for entityName: String) -> ShieldConfiguration {
-        // Record blocked attempt for this app and get the most frequently blocked app
-        let attempt = recordBlockedAttempt(for: entityName)
+    private func createShieldConfiguration(
+        for entityName: String,
+        tokenKey: String?
+    ) -> ShieldConfiguration {
+        let attempt = resolveMostBlockedAttempt(for: entityName, tokenKey: tokenKey)
 
         // Fetch saved metrics from App Group UserDefaults
         let rawSession = sharedDefaults?.string(forKey: "oruv_session_remaining")?.trimmingCharacters(in: .whitespacesAndNewlines)
         let sessionRemaining = (rawSession?.isEmpty == false) ? rawSession : "2h 15m"
-        
+
         let projectedTime = sharedDefaults?.string(forKey: "oruv_projected_time")
             ?? sharedDefaults?.string(forKey: "oruv_protected_today")
             ?? "1h 05m"
@@ -198,17 +218,12 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         )
     }
 
-    private func formatMinutes(_ minutes: Int) -> String {
-        let h = minutes / 60
-        let m = minutes % 60
-        if h > 0 && m > 0 { return "\(h)h \(m)m" }
-        if h > 0 { return "\(h)h" }
-        return "\(m)m"
-    }
-
     override func configuration(shielding application: Application) -> ShieldConfiguration {
         let name = application.localizedDisplayName ?? "This app"
-        return createShieldConfiguration(for: name)
+        let tokenKey = application.token
+            .flatMap { try? PropertyListEncoder().encode($0) }
+            .map { "app:" + $0.base64EncodedString() }
+        return createShieldConfiguration(for: name, tokenKey: tokenKey)
     }
 
     override func configuration(
@@ -216,12 +231,18 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         in category: ActivityCategory
     ) -> ShieldConfiguration {
         let name = application.localizedDisplayName ?? "This app"
-        return createShieldConfiguration(for: name)
+        let tokenKey = application.token
+            .flatMap { try? PropertyListEncoder().encode($0) }
+            .map { "app:" + $0.base64EncodedString() }
+        return createShieldConfiguration(for: name, tokenKey: tokenKey)
     }
 
     override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration {
         let domain = webDomain.domain ?? "This website"
-        return createShieldConfiguration(for: domain)
+        let tokenKey = webDomain.token
+            .flatMap { try? PropertyListEncoder().encode($0) }
+            .map { "web:" + $0.base64EncodedString() }
+        return createShieldConfiguration(for: domain, tokenKey: tokenKey)
     }
 
     override func configuration(
@@ -229,6 +250,9 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         in category: ActivityCategory
     ) -> ShieldConfiguration {
         let domain = webDomain.domain ?? "This website"
-        return createShieldConfiguration(for: domain)
+        let tokenKey = webDomain.token
+            .flatMap { try? PropertyListEncoder().encode($0) }
+            .map { "web:" + $0.base64EncodedString() }
+        return createShieldConfiguration(for: domain, tokenKey: tokenKey)
     }
 }

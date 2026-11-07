@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class DeepWorkAnchorCard extends StatelessWidget {
@@ -19,6 +21,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
   final String? projectedLabel;
   final String mostBlockedAppName;
   final int mostBlockedAppCount;
+  final bool hasMostBlockedNativeToken;
   final bool isOnBreak;
   final int breakRemainingSeconds;
   final int breakTotalSeconds;
@@ -43,6 +46,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
     this.projectedLabel,
     this.mostBlockedAppName = '',
     this.mostBlockedAppCount = 0,
+    this.hasMostBlockedNativeToken = false,
     this.isOnBreak = false,
     this.breakRemainingSeconds = 0,
     this.breakTotalSeconds = 0,
@@ -228,7 +232,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
                     isSavingTime
                         ? Icons.arrow_drop_down_sharp
                         : Icons.arrow_drop_up_sharp,
-                    size: 16,
+                    size: 25,
                     color: isSavingTime ? _accentGreen : _coralRed,
                   ),
                 ),
@@ -240,9 +244,47 @@ class DeepWorkAnchorCard extends StatelessWidget {
                       ? '${mostBlockedAppCount}x'
                       : '0',
                   label: mostBlockedAppCount > 0
-                      ? '$mostBlockedAppName Blocked'
+                      ? (mostBlockedAppName.isNotEmpty
+                            ? '$mostBlockedAppName Blocked'
+                            : 'Blocked Today')
                       : 'Urges Blocked',
                   valueColor: _primaryText,
+                  customLabelWidget:
+                      (mostBlockedAppCount > 0 &&
+                          mostBlockedAppName.isEmpty &&
+                          hasMostBlockedNativeToken &&
+                          Platform.isIOS)
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              height: 14,
+                              child: IgnorePointer(
+                                child: UiKitView(
+                                  key: ValueKey<String>(
+                                    'most_blocked_title_$mostBlockedAppCount',
+                                  ),
+                                  viewType: 'oruv/most_blocked_app_title',
+                                  creationParamsCodec:
+                                      const StandardMessageCodec(),
+                                ),
+                              ),
+                            ),
+                            Text(
+                              'Blocked',
+                              style: GoogleFonts.lora(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                                color: _mutedText,
+                                height: 1.15,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        )
+                      : null,
                 ),
               ),
             ],
@@ -333,6 +375,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
     required String label,
     required Color valueColor,
     Widget? prefixIcon,
+    Widget? customLabelWidget,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -359,18 +402,21 @@ class DeepWorkAnchorCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 5),
-        Text(
-          label,
-          style: GoogleFonts.lora(
-            fontSize: 11,
-            fontWeight: FontWeight.w400,
-            color: _mutedText,
-            height: 1.2,
+        if (customLabelWidget != null)
+          customLabelWidget
+        else
+          Text(
+            label,
+            style: GoogleFonts.lora(
+              fontSize: 11,
+              fontWeight: FontWeight.w400,
+              color: _mutedText,
+              height: 1.2,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
       ],
     );
   }

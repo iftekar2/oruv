@@ -39,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   DailyScreenTimeSnapshot? _screenTimeSnapshot;
   String _mostBlockedAppName = '';
   int _mostBlockedAppCount = 0;
+  bool _hasMostBlockedNativeToken = false;
 
   @override
   void initState() {
@@ -106,6 +107,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {
         _mostBlockedAppName = (stats['appName'] as String?) ?? '';
         _mostBlockedAppCount = (stats['count'] as int?) ?? 0;
+        _hasMostBlockedNativeToken = stats['hasNativeToken'] == true;
       });
     } catch (e) {
       debugPrint('HomeScreen._refreshBlockedAttempts note: $e');
@@ -456,6 +458,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             projectedLabel: snapshot.projectedLabel,
             mostBlockedAppName: _mostBlockedAppName,
             mostBlockedAppCount: _mostBlockedAppCount,
+            hasMostBlockedNativeToken: _hasMostBlockedNativeToken,
             screenTimeToday: (_screenTimeSnapshot?.totalMinutes != null &&
                     _screenTimeSnapshot!.totalMinutes! > 0)
                 ? ScheduleRuleModel.formatDurationMinutes(

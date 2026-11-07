@@ -22,6 +22,8 @@ class ScreenTimeManager: ObservableObject {
 
   @Published private(set) var orderedAppTokens: [ApplicationToken] = []
   @Published private(set) var orderedCategoryTokens: [ActivityCategoryToken] = []
+  @Published var mostBlockedAppToken: ApplicationToken? = nil
+  @Published var mostBlockedCategoryToken: ActivityCategoryToken? = nil
 
   @Published var activitySelection = FamilyActivitySelection() {
     didSet {
@@ -588,6 +590,104 @@ class AppTokenTitleFactory: NSObject, FlutterPlatformViewFactory {
   }
 }
 
+/// Renders the real app or category name for the most-blocked entity today using Apple's FamilyControls token.
+@available(iOS 16.0, *)
+struct NativeMostBlockedAppTitleView: View {
+  @ObservedObject var manager = ScreenTimeManager.shared
+
+  var body: some View {
+    Group {
+      if let appToken = manager.mostBlockedAppToken {
+        Label(appToken)
+          .labelStyle(.titleOnly)
+          .font(.system(size: 11, weight: .regular, design: .serif))
+          .foregroundColor(Color(red: 0.431, green: 0.416, blue: 0.431))
+          .lineLimit(1)
+      } else if let catToken = manager.mostBlockedCategoryToken {
+        Label(catToken)
+          .labelStyle(.titleOnly)
+          .font(.system(size: 11, weight: .regular, design: .serif))
+          .foregroundColor(Color(red: 0.431, green: 0.416, blue: 0.431))
+          .lineLimit(1)
+      } else {
+        Text("Urges")
+          .font(.system(size: 11, weight: .regular, design: .serif))
+          .foregroundColor(Color(red: 0.431, green: 0.416, blue: 0.431))
+          .lineLimit(1)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    .background(Color.white)
+    .ignoresSafeArea(.all)
+  }
+}
+
+class MostBlockedAppTitlePlatformView: NSObject, FlutterPlatformView {
+  private let containerView: UIView
+  private var hostingController: UIViewController?
+
+  init(frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) {
+    self.containerView = UIView(frame: frame)
+    self.containerView.backgroundColor = .white
+    self.containerView.clipsToBounds = true
+    self.containerView.isUserInteractionEnabled = false
+    super.init()
+
+    #if canImport(FamilyControls)
+    if #available(iOS 16.0, *) {
+      let swiftUIView = NativeMostBlockedAppTitleView()
+      let hosting = UIHostingController(rootView: swiftUIView)
+      hosting.view.isUserInteractionEnabled = false
+      if #available(iOS 16.4, *) {
+        hosting.safeAreaRegions = []
+      }
+      hosting.view.backgroundColor = .white
+      hosting.view.clipsToBounds = true
+      hosting.view.insetsLayoutMarginsFromSafeArea = false
+      hosting.view.translatesAutoresizingMaskIntoConstraints = false
+      self.containerView.addSubview(hosting.view)
+
+      NSLayoutConstraint.activate([
+        hosting.view.topAnchor.constraint(equalTo: self.containerView.topAnchor),
+        hosting.view.bottomAnchor.constraint(equalTo: self.containerView.bottomAnchor),
+        hosting.view.leadingAnchor.constraint(equalTo: self.containerView.leadingAnchor),
+        hosting.view.trailingAnchor.constraint(equalTo: self.containerView.trailingAnchor)
+      ])
+      self.hostingController = hosting
+    }
+    #endif
+  }
+
+  func view() -> UIView {
+    return containerView
+  }
+}
+
+class MostBlockedAppTitleFactory: NSObject, FlutterPlatformViewFactory {
+  private let messenger: FlutterBinaryMessenger
+
+  init(messenger: FlutterBinaryMessenger) {
+    self.messenger = messenger
+    super.init()
+  }
+
+  func create(
+    withFrame frame: CGRect,
+    viewIdentifier viewId: Int64,
+    arguments args: Any?
+  ) -> FlutterPlatformView {
+    return MostBlockedAppTitlePlatformView(
+      frame: frame,
+      viewIdentifier: viewId,
+      arguments: args
+    )
+  }
+
+  func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
+    return FlutterStandardMessageCodec.sharedInstance()
+  }
+}
+
 class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
   private let messenger: FlutterBinaryMessenger
 
@@ -645,6 +745,9 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
 
         let reportFactory = DeviceActivityReportFactory(messenger: registrar.messenger())
         registrar.register(reportFactory, withId: "oruv/device_activity_report")
+
+        let mostBlockedTitleFactory = MostBlockedAppTitleFactory(messenger: registrar.messenger())
+        registrar.register(mostBlockedTitleFactory, withId: "oruv/most_blocked_app_title")
       }
       #endif
 
@@ -686,42 +789,90 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
             formatter.dateFormat = "yyyy-MM-dd"
             let todayStr = formatter.string(from: Date())
 
-            // 1. Read from shared App Group JSON file (immediate, zero cross-process lag)
+            var topTokenKey = ""
+            var appName = ""
+            var count = 0
+            var total = 0
+
+            // 1. Read from shared App Group JSON file written by ShieldActionExtension
             if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
               let fileURL = containerURL.appendingPathComponent("blocked_attempts.json")
               if let data = try? Data(contentsOf: fileURL),
                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                  (json["date"] as? String) == todayStr {
-                let appName = (json["mostBlockedAppName"] as? String) ?? ""
-                let count = (json["mostBlockedCount"] as? Int) ?? 0
-                let total = (json["total"] as? Int) ?? 0
-                result([
-                  "appName": appName,
-                  "count": count,
-                  "totalAttempts": total
-                ])
-                return
+                topTokenKey = (json["mostBlockedTokenKey"] as? String) ?? ""
+                appName = (json["mostBlockedAppName"] as? String) ?? ""
+                count = (json["mostBlockedCount"] as? Int) ?? 0
+                total = (json["total"] as? Int) ?? 0
               }
             }
 
-            // 2. Fallback to UserDefaults
-            let savedDate = sharedDefaults?.string(forKey: "oruv_blocked_attempts_date")
-            var attempts = (savedDate == todayStr)
-              ? (sharedDefaults?.dictionary(forKey: "oruv_blocked_attempts_today") as? [String: Int] ?? [:])
-              : [:]
-            let mostBlocked = attempts.max(by: { $0.value < $1.value })
-            let appName = mostBlocked?.key ?? sharedDefaults?.string(forKey: "oruv_most_blocked_app_name") ?? ""
-            let count = mostBlocked?.value ?? sharedDefaults?.integer(forKey: "oruv_most_blocked_app_count") ?? 0
-            let total = attempts.values.reduce(0, +)
+            // 2. Fallback to UserDefaults if file was not found
+            if count == 0 && sharedDefaults?.string(forKey: "oruv_blocked_attempts_date") == todayStr {
+              let tokenCounts = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_counts") as? [String: Int]) ?? [:]
+              if let mostBlocked = tokenCounts.max(by: { $0.value < $1.value }) {
+                topTokenKey = mostBlocked.key
+                count = mostBlocked.value
+                total = tokenCounts.values.reduce(0, +)
+              } else {
+                topTokenKey = sharedDefaults?.string(forKey: "oruv_most_blocked_token_key") ?? ""
+                count = sharedDefaults?.integer(forKey: "oruv_most_blocked_app_count") ?? 0
+                total = sharedDefaults?.integer(forKey: "oruv_total_blocked_today") ?? 0
+              }
+              appName = sharedDefaults?.string(forKey: "oruv_most_blocked_app_name") ?? ""
+            }
+
+            // 3. Decode the ApplicationToken or ActivityCategoryToken so SwiftUI Label(token) can render its real name
+            if topTokenKey.hasPrefix("app:") {
+              let base64 = String(topTokenKey.dropFirst(4))
+              if let data = Data(base64Encoded: base64),
+                 let token = try? PropertyListDecoder().decode(ApplicationToken.self, from: data) {
+                ScreenTimeManager.shared.mostBlockedAppToken = token
+                ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+                if appName.isEmpty, let resolved = Application(token: token).localizedDisplayName, !resolved.isEmpty {
+                  appName = resolved
+                }
+              }
+            } else if topTokenKey.hasPrefix("cat:") {
+              let base64 = String(topTokenKey.dropFirst(4))
+              if let data = Data(base64Encoded: base64),
+                 let token = try? PropertyListDecoder().decode(ActivityCategoryToken.self, from: data) {
+                ScreenTimeManager.shared.mostBlockedCategoryToken = token
+                ScreenTimeManager.shared.mostBlockedAppToken = nil
+                if appName.isEmpty, let resolved = ActivityCategory(token: token).localizedDisplayName, !resolved.isEmpty {
+                  appName = resolved
+                }
+              }
+            } else if topTokenKey.hasPrefix("web:") {
+              ScreenTimeManager.shared.mostBlockedAppToken = nil
+              ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+              let base64 = String(topTokenKey.dropFirst(4))
+              if let data = Data(base64Encoded: base64),
+                 let token = try? PropertyListDecoder().decode(WebDomainToken.self, from: data),
+                 appName.isEmpty,
+                 let domain = WebDomain(token: token).domain {
+                appName = domain
+              }
+            } else if count == 0 {
+              ScreenTimeManager.shared.mostBlockedAppToken = nil
+              ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+            }
+
+            let hasNativeToken = (ScreenTimeManager.shared.mostBlockedAppToken != nil
+              || ScreenTimeManager.shared.mostBlockedCategoryToken != nil)
 
             result([
               "appName": appName,
               "count": count,
-              "totalAttempts": total
+              "totalAttempts": total,
+              "hasNativeToken": hasNativeToken
             ])
           case "resetBlockedAttempts":
             let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
             sharedDefaults?.removeObject(forKey: "oruv_blocked_attempts_today")
+            sharedDefaults?.removeObject(forKey: "oruv_blocked_token_counts")
+            sharedDefaults?.removeObject(forKey: "oruv_blocked_token_names")
+            sharedDefaults?.removeObject(forKey: "oruv_most_blocked_token_key")
             sharedDefaults?.removeObject(forKey: "oruv_most_blocked_app_name")
             sharedDefaults?.removeObject(forKey: "oruv_most_blocked_app_count")
             sharedDefaults?.removeObject(forKey: "oruv_total_blocked_today")
@@ -731,6 +882,8 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
               try? FileManager.default.removeItem(at: fileURL)
             }
             sharedDefaults?.synchronize()
+            ScreenTimeManager.shared.mostBlockedAppToken = nil
+            ScreenTimeManager.shared.mostBlockedCategoryToken = nil
             result(true)
           case "getDailyScreenTime":
             let isApproved = AuthorizationCenter.shared.authorizationStatus == .approved
