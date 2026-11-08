@@ -132,7 +132,7 @@ class _InsightsPageState extends State<InsightsPage> {
             title: 'Distracting Apps',
             durationText: AppScreenTimeItem.formatMinutes(distractingMins),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           _buildAppCard(
             apps: distractingApps,
             maxAppMinutes: maxAppMins,
@@ -140,14 +140,14 @@ class _InsightsPageState extends State<InsightsPage> {
             emptyMessage: 'No distracting app activity recorded today.',
           ),
 
-          const SizedBox(height: 26),
+          const SizedBox(height: 14),
 
-          // ─── 4. PRODUCTIVE & OTHER SECTION ───────────────────────────
+          // ─── 4. OTHER APPS SECTION ───────────────────────────────────
           _buildSectionHeader(
-            title: 'Productive & Other',
+            title: 'Other Apps',
             durationText: AppScreenTimeItem.formatMinutes(otherMins),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           _buildAppCard(
             apps: otherApps,
             maxAppMinutes: maxAppMins,
@@ -168,6 +168,10 @@ class _InsightsPageState extends State<InsightsPage> {
   // ─── HERO HEADER ─────────────────────────────────────────────────────────
 
   Widget _buildHeroHeader(int totalMinutes) {
+    final trendText = _selectedGranularity == 'D'
+        ? '1h 52m today'
+        : (_selectedGranularity == 'W' ? '12h 40m this week' : '48h 15m this month');
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,7 +209,7 @@ class _InsightsPageState extends State<InsightsPage> {
                 ),
                 const SizedBox(width: 3),
                 Text(
-                  '1h 52m today',
+                  trendText,
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -225,48 +229,37 @@ class _InsightsPageState extends State<InsightsPage> {
 
   Widget _buildGranularityPill() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3.5),
+      padding: const EdgeInsets.all(4.5),
       decoration: BoxDecoration(
         color: const Color(0xFFF9F6F4),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFEFE9E5), width: 1.1),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFEFE9E5), width: 1.2),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: ['D', 'W', 'M'].map((granularity) {
           final isSelected = _selectedGranularity == granularity;
           return GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () {
-              if (granularity != 'D') {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      granularity == 'W'
-                          ? 'Weekly view will be available in the next update.'
-                          : 'Monthly view will be available in the next update.',
-                    ),
-                    duration: const Duration(seconds: 2),
-                    backgroundColor: _emeraldGreen,
-                  ),
-                );
-                return;
-              }
               setState(() => _selectedGranularity = granularity);
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 34),
               padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 5,
+                horizontal: 16,
+                vertical: 7.5,
               ),
               decoration: BoxDecoration(
                 color: isSelected ? const Color(0xFF262326) : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
               ),
+              alignment: Alignment.center,
               child: Text(
                 granularity,
                 style: GoogleFonts.lora(
-                  fontSize: 12.5,
+                  fontSize: 14.5,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected ? Colors.white : const Color(0xFF4A4A4A),
                 ),
@@ -407,18 +400,9 @@ class _InsightsPageState extends State<InsightsPage> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _cardBorder, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      decoration: const BoxDecoration(
+        color: Colors.transparent,
       ),
       child: apps.isEmpty
           ? Padding(
@@ -434,7 +418,7 @@ class _InsightsPageState extends State<InsightsPage> {
               itemCount: apps.length,
               separatorBuilder: (_, __) => const Divider(
                 color: _dividerColor,
-                height: 26,
+                height: 22,
                 thickness: 1,
               ),
               itemBuilder: (context, index) {
