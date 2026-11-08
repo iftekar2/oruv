@@ -8,5 +8,8 @@ struct ScreenTimeReportExtension: DeviceActivityReportExtension {
         TotalActivityReport { configuration in
             TotalActivityView(configuration: configuration)
         }
+        InsightsActivityReport { configuration in
+            InsightsActivityView(configuration: configuration)
+        }
     }
 }

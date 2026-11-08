@@ -10,7 +10,10 @@ class DailyScreenTimeSnapshot {
   /// Real total minutes for today. Null when the OS did not provide data.
   final int? totalMinutes;
 
-  /// Real per-app usage for today (Android only). Never fabricated.
+  /// Real pickups per hour for today.
+  final int? pickupsPerHour;
+
+  /// Real per-app usage for today. Never fabricated.
   final List<AppScreenTimeItem> apps;
 
   /// On iOS, Apple only exposes real usage data inside a
@@ -20,6 +23,7 @@ class DailyScreenTimeSnapshot {
   const DailyScreenTimeSnapshot({
     required this.isAuthorized,
     this.totalMinutes,
+    this.pickupsPerHour,
     this.apps = const [],
     this.useNativeIosReport = false,
   });
@@ -33,15 +37,48 @@ class ScreenTimeService {
   static const Color _coralPink = Color(0xFFF26879);
   static const Color _emeraldGreen = Color(0xFF1D6F58);
 
+  static const List<String> _distractingKeywords = [
+    'tiktok', 'musically', 'aweme', 'instagram', 'burbn', 'snapchat', 'picaboo',
+    'twitter', 'tweetie', 'atebits', 'reddit', 'facebook', 'threads', 'barcelona',
+    'discord', 'pinterest', 'tumblr', 'bereal', 'bluesky', 'bsky', 'mastodon',
+    'yikyak', 'fizz', 'linkedin', 'wechat', 'kik', 'telegram', 'whatsapp', 'messenger',
+    'hinge', 'tinder', 'bumble',
+    'youtube', 'netflix', 'twitch', 'hulu', 'disney', 'hbomax', 'wbd.stream',
+    'primevideo', 'crunchyroll', 'peacock', 'paramount', 'tubi', 'plutotv',
+    'kick', '9gag', 'ifunny', 'bilibili', 'dailymotion', 'webtoon',
+    'roblox', 'minecraft', 'brawlstars', 'clashroyale', 'clashofclans', 'supercell',
+    'candycrush', 'king.', 'genshin', 'hoyoverse', 'honkai', 'pubg', 'callofduty',
+    'activision', 'fifa', 'madden', 'nba2k', 'amongus', 'innersloth',
+    'subwaysurfers', 'pokemon', 'niantic', 'monopoly', 'scopely',
+    'royalmatch', 'dreamgames', 'chess', 'steam', 'playstation', 'xbox', 'epicgames',
+    'fortnite', 'riotgames', 'hearthstone', 'blizzard', 'zynga', 'rovio', 'angrybirds',
+    'miniclip', 'playrix', 'gardenscapes', 'homescapes', 'blockblast', 'balatro', 'wordle',
+  ];
+
+  static bool isDistractingApp({required String name, String id = ''}) {
+    final lowerName = name.toLowerCase().trim();
+    final lowerId = id.toLowerCase().trim();
+    if (lowerName.contains('oruv') || lowerId.contains('oruv')) {
+      return false;
+    }
+    if (lowerName == 'x') return true;
+    for (final kw in _distractingKeywords) {
+      if (lowerName.contains(kw) || lowerId.contains(kw)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Fetches today's REAL screen time.
   ///
   /// - iOS: returns `useNativeIosReport: true` when authorized. The actual
   ///   numbers + icons are rendered by the `ScreenTimeReportExtension`
   ///   (Apple does not allow the main app to read usage minutes).
   /// - Android: queries `UsageStatsManager` + `PackageManager` for real
-  ///   durations and real app icons.
+  ///   durations, categories, pickups, and real app icons.
   static Future<DailyScreenTimeSnapshot> fetchDailyScreenTime({
-    int maxApps = 5,
+    int maxApps = 100,
   }) async {
     if (!Platform.isIOS && !Platform.isAndroid) {
       return DailyScreenTimeSnapshot.unavailable;
@@ -55,6 +92,7 @@ class ScreenTimeService {
         if (!authorized) return DailyScreenTimeSnapshot.unavailable;
 
         final rawTotal = (res?['totalMinutes'] as num?)?.toInt() ?? 0;
+        final rawPickups = (res?['pickupsPerHour'] as num?)?.toInt();
         final rawApps = res?['apps'];
         final parsedApps = <AppScreenTimeItem>[];
 
@@ -64,12 +102,14 @@ class ScreenTimeService {
             if (entry is! Map) continue;
             final map = Map<String, dynamic>.from(entry);
             final name = (map['name'] ?? 'App').toString();
-            final isDistracting = map['isDistracting'] == true;
+            final id = (map['id'] ?? 'ios_app_$i').toString();
+            final isDistracting = map['isDistracting'] == true ||
+                isDistractingApp(name: name, id: id);
             final mins = (map['durationMinutes'] as num?)?.toInt() ?? 0;
 
             parsedApps.add(
               AppScreenTimeItem(
-                id: 'ios_app_$i',
+                id: id,
                 name: name,
                 durationMinutes: mins,
                 barColor: isDistracting ? _coralPink : _emeraldGreen,
@@ -82,6 +122,7 @@ class ScreenTimeService {
         return DailyScreenTimeSnapshot(
           isAuthorized: true,
           totalMinutes: rawTotal,
+          pickupsPerHour: rawPickups,
           apps: parsedApps,
           useNativeIosReport: true,
         );
@@ -98,6 +139,7 @@ class ScreenTimeService {
       if (!authorized) return DailyScreenTimeSnapshot.unavailable;
 
       final rawTotal = (res['totalMinutes'] as num?)?.toInt() ?? 0;
+      final rawPickups = (res['pickupsPerHour'] as num?)?.toInt() ?? 0;
       final rawApps = res['apps'];
       final parsedApps = <AppScreenTimeItem>[];
 
@@ -106,8 +148,12 @@ class ScreenTimeService {
           final entry = rawApps[i];
           if (entry is! Map) continue;
           final map = Map<String, dynamic>.from(entry);
+          final id = (map['id'] ?? 'app_$i').toString();
           final name = (map['name'] ?? 'App').toString();
           final isOwnApp = map['isOwnApp'] == true;
+          final isDistracting = !isOwnApp &&
+              (map['isDistracting'] == true ||
+                  isDistractingApp(name: name, id: id));
 
           Uint8List? iconBytes;
           final rawBytes = map['iconBytes'];
@@ -119,11 +165,12 @@ class ScreenTimeService {
 
           parsedApps.add(
             AppScreenTimeItem(
-              id: (map['id'] ?? 'app_$i').toString(),
+              id: id,
               name: name,
               durationMinutes: (map['durationMinutes'] as num?)?.toInt() ?? 0,
               barColor: isOwnApp ? _emeraldGreen : _coralPink,
               iconBytes: iconBytes,
+              isDistracting: isDistracting,
             ),
           );
         }
@@ -132,6 +179,7 @@ class ScreenTimeService {
       return DailyScreenTimeSnapshot(
         isAuthorized: true,
         totalMinutes: rawTotal,
+        pickupsPerHour: rawPickups,
         apps: parsedApps,
       );
     } catch (e) {

@@ -284,6 +284,27 @@ struct NativeDeviceActivityReportContainerView: View {
     .allowsHitTesting(false)
   }
 }
+
+/// Hosts Apple's `DeviceActivityReport` view for the full interactive Insights tab.
+@available(iOS 16.0, *)
+struct NativeInsightsReportContainerView: View {
+  var body: some View {
+    let startOfDay = Calendar.current.startOfDay(for: Date())
+    let interval = DateInterval(start: startOfDay, end: Date())
+    let filter = DeviceActivityFilter(
+      segment: .daily(during: interval),
+      users: .all,
+      devices: .init([.iPhone, .iPad])
+    )
+    DeviceActivityReport(
+      DeviceActivityReport.Context("InsightsScreenTime"),
+      filter: filter
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(Color.white)
+    .ignoresSafeArea(.all)
+  }
+}
 #endif
 
 class FamilyActivityPickerPlatformView: NSObject, FlutterPlatformView {
@@ -466,6 +487,47 @@ class DeviceActivityReportPlatformView: NSObject, FlutterPlatformView {
       let swiftUIView = NativeDeviceActivityReportContainerView()
       let hosting = UIHostingController(rootView: swiftUIView)
       hosting.view.isUserInteractionEnabled = false
+      if #available(iOS 16.4, *) {
+        hosting.safeAreaRegions = []
+      }
+      hosting.view.backgroundColor = .white
+      hosting.view.clipsToBounds = true
+      hosting.view.insetsLayoutMarginsFromSafeArea = false
+      hosting.view.translatesAutoresizingMaskIntoConstraints = false
+      self.containerView.addSubview(hosting.view)
+
+      NSLayoutConstraint.activate([
+        hosting.view.topAnchor.constraint(equalTo: self.containerView.topAnchor),
+        hosting.view.bottomAnchor.constraint(equalTo: self.containerView.bottomAnchor),
+        hosting.view.leadingAnchor.constraint(equalTo: self.containerView.leadingAnchor),
+        hosting.view.trailingAnchor.constraint(equalTo: self.containerView.trailingAnchor)
+      ])
+      self.hostingController = hosting
+    }
+    #endif
+  }
+
+  func view() -> UIView {
+    return containerView
+  }
+}
+
+class InsightsActivityReportPlatformView: NSObject, FlutterPlatformView {
+  private let containerView: UIView
+  private var hostingController: UIViewController?
+
+  init(frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) {
+    self.containerView = UIView(frame: frame)
+    self.containerView.backgroundColor = .white
+    self.containerView.clipsToBounds = true
+    self.containerView.isUserInteractionEnabled = true
+    super.init()
+
+    #if canImport(DeviceActivity)
+    if #available(iOS 16.0, *) {
+      let swiftUIView = NativeInsightsReportContainerView()
+      let hosting = UIHostingController(rootView: swiftUIView)
+      hosting.view.isUserInteractionEnabled = true
       if #available(iOS 16.4, *) {
         hosting.safeAreaRegions = []
       }
@@ -1001,6 +1063,31 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
     return FlutterStandardMessageCodec.sharedInstance()
   }
 }
+
+class InsightsActivityReportFactory: NSObject, FlutterPlatformViewFactory {
+  private let messenger: FlutterBinaryMessenger
+
+  init(messenger: FlutterBinaryMessenger) {
+    self.messenger = messenger
+    super.init()
+  }
+
+  func create(
+    withFrame frame: CGRect,
+    viewIdentifier viewId: Int64,
+    arguments args: Any?
+  ) -> FlutterPlatformView {
+    return InsightsActivityReportPlatformView(
+      frame: frame,
+      viewIdentifier: viewId,
+      arguments: args
+    )
+  }
+
+  func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
+    return FlutterStandardMessageCodec.sharedInstance()
+  }
+}
 #endif
 
 @main
@@ -1034,6 +1121,9 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
 
         let reportFactory = DeviceActivityReportFactory(messenger: registrar.messenger())
         registrar.register(reportFactory, withId: "oruv/device_activity_report")
+
+        let insightsReportFactory = InsightsActivityReportFactory(messenger: registrar.messenger())
+        registrar.register(insightsReportFactory, withId: "oruv/insights_activity_report")
 
         let mostBlockedTitleFactory = MostBlockedAppTitleFactory(messenger: registrar.messenger())
         registrar.register(mostBlockedTitleFactory, withId: "oruv/most_blocked_app_title")
@@ -1259,6 +1349,22 @@ class DeviceActivityReportFactory: NSObject, FlutterPlatformViewFactory {
             }
             if let isSavingTime = args?["isSavingTime"] as? Bool {
               sharedDefaults?.set(isSavingTime, forKey: "oruv_is_saving_time")
+            }
+            if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
+              let metricsURL = containerURL.appendingPathComponent("insights_metrics.json")
+              var metricsDict: [String: Any] = [:]
+              if let baselineMinutes = args?["baselineMinutes"] as? Int {
+                metricsDict["baselineMinutes"] = baselineMinutes
+              }
+              if let elapsedSavedMinutes = args?["elapsedSavedMinutes"] as? Int {
+                metricsDict["elapsedSavedMinutes"] = elapsedSavedMinutes
+              }
+              if let projectedTimeText = args?["projectedTimeText"] as? String {
+                metricsDict["projectedTimeText"] = projectedTimeText
+              }
+              if !metricsDict.isEmpty, let data = try? JSONSerialization.data(withJSONObject: metricsDict, options: []) {
+                try? data.write(to: metricsURL, options: .atomic)
+              }
             }
             ScreenTimeManager.shared.syncShield(shouldBlock: shouldBlock)
             result(true)

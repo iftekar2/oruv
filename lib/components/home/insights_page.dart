@@ -1,15 +1,22 @@
+import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/home/daily_screen_time_card.dart';
+import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/services/screen_time_service.dart';
 
 class InsightsPage extends StatefulWidget {
   final DailyScreenTimeSnapshot? screenTimeSnapshot;
+  final String? timeSavedText;
   final VoidCallback? onConnectScreenTime;
 
   const InsightsPage({
     super.key,
     this.screenTimeSnapshot,
+    this.timeSavedText,
     this.onConnectScreenTime,
   });
 
@@ -32,58 +39,67 @@ class _InsightsPageState extends State<InsightsPage> {
   static const Color _dividerColor = Color(0xFFF4EFEA);
 
   List<AppScreenTimeItem> _getDistractingApps(List<AppScreenTimeItem> allApps) {
-    return allApps.where((a) => a.isDistracting).toList();
+    return allApps
+        .where(
+          (a) =>
+              a.isDistracting ||
+              ScreenTimeService.isDistractingApp(name: a.name, id: a.id),
+        )
+        .toList();
   }
 
   List<AppScreenTimeItem> _getOtherApps(List<AppScreenTimeItem> allApps) {
-    return allApps.where((a) => !a.isDistracting).toList();
+    return allApps
+        .where(
+          (a) =>
+              !a.isDistracting &&
+              !ScreenTimeService.isDistractingApp(name: a.name, id: a.id),
+        )
+        .toList();
   }
 
-  /// Exact sample apps from the design screenshot when no usage is cached yet
-  List<AppScreenTimeItem> _buildSampleApps() {
-    return const [
-      AppScreenTimeItem(
-        id: 'sample_tiktok',
-        name: 'TikTok',
-        durationMinutes: 80, // 1h 20m
-        barColor: _redBarColor,
-        isDistracting: true,
-      ),
-      AppScreenTimeItem(
-        id: 'sample_instagram',
-        name: 'Instagram',
-        durationMinutes: 79, // 1h 19m
-        barColor: _redBarColor,
-        isDistracting: true,
-      ),
-      AppScreenTimeItem(
-        id: 'sample_oruv',
-        name: 'Oruv',
-        durationMinutes: 61, // 1h 1m
-        barColor: _emeraldGreen,
-        isDistracting: false,
-      ),
-      AppScreenTimeItem(
-        id: 'sample_safari',
-        name: 'Safari',
-        durationMinutes: 49,
-        barColor: _mintBarColor,
-        isDistracting: false,
-      ),
-      AppScreenTimeItem(
-        id: 'sample_snkrs',
-        name: 'Nike SNKRS: Sneakers & Apparel',
-        durationMinutes: 9,
-        barColor: _greyBarColor,
-        isDistracting: false,
-      ),
-    ];
+  String _computeDynamicTimeSaved(int distractingMins) {
+    int baselineMinutes = 300;
+    final choice = OnboardingData.instance.dailyScreenTime;
+    if (choice == '< 2 hours') {
+      baselineMinutes = 120;
+    } else if (choice == '3 - 4 hours') {
+      baselineMinutes = 240;
+    } else if (choice == '5 - 6 hours') {
+      baselineMinutes = 360;
+    } else if (choice == '7+ hours') {
+      baselineMinutes = 480;
+    }
+
+    final now = DateTime.now();
+    final minsSinceMidnight = now.hour * 60 + now.minute;
+    final wakingElapsedMins = (minsSinceMidnight - 420).clamp(30, 960);
+    final expectedDistractingSoFar =
+        (baselineMinutes * (wakingElapsedMins / 960.0) * 0.65).round();
+    final savedMinutes = math.max(0, expectedDistractingSoFar - distractingMins);
+    if (savedMinutes > 0) {
+      return AppScreenTimeItem.formatMinutes(savedMinutes);
+    }
+    return widget.timeSavedText ?? '0m';
   }
 
   @override
   Widget build(BuildContext context) {
-    final rawApps = widget.screenTimeSnapshot?.apps ?? [];
-    final effectiveApps = rawApps.isNotEmpty ? rawApps : _buildSampleApps();
+    final isAuthorized = widget.screenTimeSnapshot?.isAuthorized == true;
+
+    // On iOS, Apple only exposes real per-app usage, real app icons, categories,
+    // and pickups inside the DeviceActivityReport extension.
+    if (Platform.isIOS && isAuthorized) {
+      return const SizedBox.expand(
+        child: UiKitView(
+          viewType: 'oruv/insights_activity_report',
+          creationParamsCodec: StandardMessageCodec(),
+          hitTestBehavior: PlatformViewHitTestBehavior.opaque,
+        ),
+      );
+    }
+
+    final effectiveApps = widget.screenTimeSnapshot?.apps ?? const [];
 
     final distractingApps = _getDistractingApps(effectiveApps);
     final otherApps = _getOtherApps(effectiveApps);
@@ -96,11 +112,8 @@ class _InsightsPageState extends State<InsightsPage> {
       0,
       (sum, item) => sum + item.durationMinutes,
     );
-    final totalMins =
-        (widget.screenTimeSnapshot?.totalMinutes != null &&
-            widget.screenTimeSnapshot!.totalMinutes! > 0)
-        ? widget.screenTimeSnapshot!.totalMinutes!
-        : (distractingMins + otherMins);
+    final rawTotal = widget.screenTimeSnapshot?.totalMinutes ?? 0;
+    final totalMins = math.max(rawTotal, distractingMins + otherMins);
 
     final pctDistracted = totalMins > 0
         ? ((distractingMins / totalMins) * 100).round().clamp(0, 100)
@@ -112,11 +125,20 @@ class _InsightsPageState extends State<InsightsPage> {
               .map((e) => e.durationMinutes)
               .reduce((a, b) => a > b ? a : b);
 
+    final pickupsPerHour =
+        widget.screenTimeSnapshot?.pickupsPerHour ?? (totalMins > 0 ? 1 : 0);
+    final timeSavedText = _computeDynamicTimeSaved(distractingMins);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 36),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (!isAuthorized) ...[
+            _buildAuthorizationPrompt(),
+            const SizedBox(height: 22),
+          ],
+
           // ─── 1. TOP HERO: Screen Time + Granularity Switcher ────────
           _buildHeroHeader(totalMins),
 
@@ -125,8 +147,8 @@ class _InsightsPageState extends State<InsightsPage> {
           // ─── 2. 3-COLUMN METRICS SUMMARY CARD ────────────────────────
           _buildMetricsSummaryCard(
             distractedPercentage: '$pctDistracted%',
-            timeSavedDuration: '1h 52m',
-            pickupsPerHour: '4',
+            timeSavedDuration: timeSavedText,
+            pickupsPerHour: '$pickupsPerHour',
           ),
 
           const SizedBox(height: 26),
@@ -144,7 +166,7 @@ class _InsightsPageState extends State<InsightsPage> {
             emptyMessage: 'No distracting app activity recorded today.',
           ),
 
-          const SizedBox(height: 30),
+          const SizedBox(height: 16),
 
           // ─── 4. OTHER APPS SECTION ───────────────────────────────────
           _buildSectionHeader(
@@ -159,11 +181,6 @@ class _InsightsPageState extends State<InsightsPage> {
             emptyMessage: 'No other app activity recorded today.',
             isOtherSection: true,
           ),
-
-          if (widget.screenTimeSnapshot?.isAuthorized != true) ...[
-            const SizedBox(height: 22),
-            _buildAuthorizationPrompt(),
-          ],
         ],
       ),
     );
@@ -277,7 +294,7 @@ class _InsightsPageState extends State<InsightsPage> {
           Expanded(
             child: _buildMetricColumn(
               value: distractedPercentage,
-              label: 'Distracted',
+              label: '% DISTRACTED',
               valueColor: _primaryText,
             ),
           ),
@@ -286,7 +303,7 @@ class _InsightsPageState extends State<InsightsPage> {
           Expanded(
             child: _buildMetricColumn(
               value: timeSavedDuration,
-              label: 'Time Saved',
+              label: 'TIME SAVED',
               valueColor: _emeraldGreen,
             ),
           ),
@@ -295,7 +312,7 @@ class _InsightsPageState extends State<InsightsPage> {
           Expanded(
             child: _buildMetricColumn(
               value: pickupsPerHour,
-              label: 'Pickups/HR',
+              label: 'PICKUPS/HR',
               valueColor: _primaryText,
             ),
           ),
@@ -401,14 +418,15 @@ class _InsightsPageState extends State<InsightsPage> {
                 );
 
                 final isOruv = item.name.toLowerCase().contains('oruv');
-                final isSafari = item.name.toLowerCase().contains('safari');
+                final isBrowser =
+                    item.name.toLowerCase().contains('safari') ||
+                    item.name.toLowerCase().contains('chrome');
 
-                // Bar color logic to match screenshot
                 Color barColor = defaultBarColor;
                 if (isOtherSection) {
                   if (isOruv) {
                     barColor = _emeraldGreen;
-                  } else if (isSafari) {
+                  } else if (isBrowser) {
                     barColor = _mintBarColor;
                   } else {
                     barColor = _greyBarColor;
@@ -485,7 +503,6 @@ class _InsightsPageState extends State<InsightsPage> {
           ],
         ),
         const SizedBox(height: 10),
-        // Wide horizontal progress bar running across the full width
         Container(
           height: 7,
           width: double.infinity,
@@ -524,114 +541,15 @@ class _InsightsPageState extends State<InsightsPage> {
             item.iconBytes!,
             fit: BoxFit.cover,
             gaplessPlayback: true,
-            errorBuilder: (_, __, ___) => _buildBrandOrMonogramIcon(item.name),
+            errorBuilder: (_, __, ___) => _buildMonogramIcon(item.name),
           ),
         ),
       );
     }
-    return _buildBrandOrMonogramIcon(item.name);
+    return _buildMonogramIcon(item.name);
   }
 
-  Widget _buildBrandOrMonogramIcon(String name) {
-    final lower = name.toLowerCase();
-
-    // 1. TikTok: Black rounded box with "Tk"
-    if (lower.contains('tiktok')) {
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          'Tk',
-          style: GoogleFonts.lora(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-
-    // 2. Instagram: Orange/pink gradient with "Ig"
-    if (lower.contains('instagram')) {
-      return Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFD1D1D), Color(0xFFE1306C), Color(0xFF833AB4)],
-            begin: Alignment.bottomLeft,
-            end: Alignment.topRight,
-          ),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          'Ig',
-          style: GoogleFonts.lora(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-
-    // 3. Oruv: Cream box with green sailboat/shield icon
-    if (lower.contains('oruv')) {
-      return Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFF3EFEA),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE5DFD7), width: 0.8),
-        ),
-        alignment: Alignment.center,
-        child: const Icon(
-          Icons.sailing_rounded,
-          size: 20,
-          color: _emeraldGreen,
-        ),
-      );
-    }
-
-    // 4. Safari: Light blue tinted box with blue compass icon
-    if (lower.contains('safari')) {
-      return Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFEBF4FF),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFD6E7FF), width: 0.8),
-        ),
-        alignment: Alignment.center,
-        child: const Icon(
-          Icons.explore_outlined,
-          size: 21,
-          color: Color(0xFF007AFF),
-        ),
-      );
-    }
-
-    // 5. Nike SNKRS: Red box with white "SNKRS"
-    if (lower.contains('snkrs') || lower.contains('nike')) {
-      return Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFE52E2E),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          'SNKRS',
-          style: GoogleFonts.inter(
-            fontSize: 7.5,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.4,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-
-    // Default Monogram
+  Widget _buildMonogramIcon(String name) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFEEEBE7),

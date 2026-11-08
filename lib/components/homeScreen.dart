@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/home/adjust_anchor_sheet.dart';
 import 'package:oruv/components/home/daily_screen_time_card.dart';
 import 'package:oruv/components/home/deep_work_anchor_card.dart';
@@ -461,6 +460,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       case 2:
         return InsightsPage(
           screenTimeSnapshot: _screenTimeSnapshot,
+          timeSavedText: snapshot.projectedTimeText,
           onConnectScreenTime: () async {
             await ScreenTimeService.requestAuthorization();
             await _refreshDailyScreenTime();
@@ -518,7 +518,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             useNativeIosReport:
                 _screenTimeSnapshot?.useNativeIosReport ?? false,
             totalMinutes: _screenTimeSnapshot?.totalMinutes,
-            apps: _screenTimeSnapshot?.apps ?? const [],
+            apps: (_screenTimeSnapshot?.apps ?? const []).take(5).toList(),
             onConnect: () async {
               await ScreenTimeService.requestAuthorization();
               await _refreshDailyScreenTime();
@@ -541,42 +541,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             isGrid: false,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildInsightsTabPlaceholder(LiveAnchorSnapshot snapshot) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.bar_chart_rounded,
-              size: 48,
-              color: Color(0xFF1D6F58),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Focus Insights',
-              style: GoogleFonts.lora(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1B1B1D),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${snapshot.focusedDuration} focused today \u2022 ${snapshot.focusScore} Focus Score',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.lora(
-                fontSize: 13.5,
-                color: const Color(0xFF6E6A6E),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

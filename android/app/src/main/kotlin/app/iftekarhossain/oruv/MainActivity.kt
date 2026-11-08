@@ -1,6 +1,7 @@
 package app.iftekarhossain.oruv
 
 import android.app.AppOpsManager
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -19,10 +20,42 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
 import java.util.Calendar
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 open class MainActivity : FlutterActivity() {
     companion object {
         private const val SCREEN_TIME_CHANNEL = "oruv/screen_time"
+
+        private val DISTRACTING_KEYWORDS = listOf(
+            "tiktok", "musically", "aweme", "instagram", "burbn", "snapchat", "picaboo",
+            "twitter", "tweetie", "reddit", "facebook", "threads", "barcelona",
+            "discord", "pinterest", "tumblr", "bereal", "bluesky", "bsky", "mastodon",
+            "yikyak", "fizz", "linkedin", "wechat", "kik", "telegram", "whatsapp", "messenger",
+            "hinge", "tinder", "bumble",
+            "youtube", "netflix", "twitch", "hulu", "disney", "hbomax", "wbd.stream",
+            "primevideo", "crunchyroll", "peacock", "paramount", "tubi", "plutotv",
+            "kick", "9gag", "ifunny", "bilibili", "dailymotion", "webtoon",
+            "roblox", "minecraft", "brawlstars", "clashroyale", "clashofclans", "supercell",
+            "candycrush", "king.", "genshin", "hoyoverse", "honkai", "pubg", "callofduty",
+            "activision", "fifa", "madden", "nba2k", "amongus", "innersloth",
+            "subwaysurfers", "pokemon", "niantic", "monopoly", "scopely",
+            "royalmatch", "dreamgames", "chess", "steam", "playstation", "xbox", "epicgames",
+            "fortnite", "riotgames", "hearthstone", "blizzard", "zynga", "rovio", "angrybirds",
+            "miniclip", "playrix", "gardenscapes", "homescapes", "blockblast", "balatro", "wordle"
+        )
+
+        private val NON_DISTRACTING_KEYWORDS = listOf(
+            "oruv", "safari", "chrome", "firefox", "brave", "duckduckgo", "arc", "opera",
+            "settings", "dialer", "phone", "mms", "messages", "contacts", "mail", "gmail", "outlook",
+            "calendar", "notes", "keep", "reminders", "clock", "deskclock", "calculator",
+            "weather", "maps", "waze", "camera", "gallery", "photos", "wallet", "health", "fitness",
+            "files", "documents", "snkrs", "nike", "amazon", "ebay", "etsy", "target", "walmart",
+            "uber", "lyft", "doordash", "instacart", "slack", "teams", "zoom", "notion", "obsidian",
+            "linear", "github", "figma", "canva", "chatgpt", "openai", "claude", "gemini",
+            "docs", "sheets", "slides", "drive", "word", "excel", "powerpoint", "onedrive", "dropbox",
+            "todoist", "trello", "asana", "jira", "duolingo", "anki", "canvas", "coursera", "khan", "kindle"
+        )
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -51,7 +84,7 @@ open class MainActivity : FlutterActivity() {
                 }
 
                 "getDailyScreenTime" -> {
-                    val maxApps = (call.argument<Int>("maxApps") ?: 8).coerceIn(1, 25)
+                    val maxApps = (call.argument<Int>("maxApps") ?: 100).coerceIn(1, 200)
                     val payload = queryTodayScreenTime(maxApps)
                     result(payload)
                 }
@@ -102,12 +135,38 @@ open class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun isDistractingApp(pkgName: String, appLabel: String, appInfo: ApplicationInfo): Boolean {
+        if (pkgName == packageName) return false
+
+        val lowerPkg = pkgName.lowercase()
+        val lowerLabel = appLabel.lowercase().trim()
+
+        if (lowerLabel == "x") return true
+        if (DISTRACTING_KEYWORDS.any { lowerPkg.contains(it) || lowerLabel.contains(it) }) {
+            return true
+        }
+        if (NON_DISTRACTING_KEYWORDS.any { lowerPkg.contains(it) || lowerLabel.contains(it) }) {
+            return false
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            when (appInfo.category) {
+                ApplicationInfo.CATEGORY_GAME,
+                ApplicationInfo.CATEGORY_SOCIAL,
+                ApplicationInfo.CATEGORY_VIDEO -> return true
+            }
+        }
+
+        return false
+    }
+
     private fun queryTodayScreenTime(maxApps: Int): Map<String, Any> {
         val authorized = hasUsageStatsPermission()
         if (!authorized) {
             return mapOf(
                 "authorized" to false,
                 "totalMinutes" to 0,
+                "pickupsPerHour" to 0,
                 "apps" to emptyList<Map<String, Any?>>()
             )
         }
@@ -117,6 +176,7 @@ open class MainActivity : FlutterActivity() {
                 ?: return mapOf(
                     "authorized" to false,
                     "totalMinutes" to 0,
+                    "pickupsPerHour" to 0,
                     "apps" to emptyList<Map<String, Any?>>()
                 )
 
@@ -148,7 +208,6 @@ open class MainActivity : FlutterActivity() {
                 null
             } ?: continue
 
-            // Include user-installed apps, updated system apps, or apps with a launcher icon
             val hasLaunchIntent = pm.getLaunchIntentForPackage(pkgName) != null
             val isSystemOnly = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 &&
                 (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0
@@ -160,6 +219,7 @@ open class MainActivity : FlutterActivity() {
             val minutes = (foregroundMs / 60_000L).toInt().coerceAtLeast(1)
             val appLabel = pm.getApplicationLabel(appInfo).toString().ifBlank { pkgName }
             val iconBytes = extractAppIconPngBytes(pm, pkgName)
+            val isDistracting = isDistractingApp(pkgName, appLabel, appInfo)
 
             appEntries.add(
                 mapOf(
@@ -167,7 +227,8 @@ open class MainActivity : FlutterActivity() {
                     "name" to appLabel,
                     "durationMinutes" to minutes,
                     "iconBytes" to iconBytes,
-                    "isOwnApp" to (pkgName == packageName)
+                    "isOwnApp" to (pkgName == packageName),
+                    "isDistracting" to isDistracting
                 )
             )
         }
@@ -177,12 +238,60 @@ open class MainActivity : FlutterActivity() {
             .take(maxApps)
 
         val totalMinutes = (totalForegroundMillis / 60_000L).toInt()
+        val pickupsPerHour = computePickupsPerHour(
+            usageStatsManager = usageStatsManager,
+            startOfDayMillis = startOfDayMillis,
+            nowMillis = nowMillis,
+            totalMinutes = totalMinutes,
+            appsCount = sortedApps.size
+        )
 
         return mapOf(
             "authorized" to true,
             "totalMinutes" to totalMinutes,
+            "pickupsPerHour" to pickupsPerHour,
             "apps" to sortedApps
         )
+    }
+
+    private fun computePickupsPerHour(
+        usageStatsManager: UsageStatsManager,
+        startOfDayMillis: Long,
+        nowMillis: Long,
+        totalMinutes: Int,
+        appsCount: Int
+    ): Int {
+        var pickups = 0
+        var firstEventMillis = 0L
+        try {
+            val events = usageStatsManager.queryEvents(startOfDayMillis, nowMillis)
+            val event = UsageEvents.Event()
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                if (firstEventMillis == 0L && event.timeStamp > startOfDayMillis) {
+                    firstEventMillis = event.timeStamp
+                }
+                if (event.eventType == UsageEvents.Event.KEYGUARD_HIDDEN ||
+                    event.eventType == UsageEvents.Event.SCREEN_INTERACTIVE
+                ) {
+                    pickups++
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        val sevenAmMillis = startOfDayMillis + 7L * 3_600_000L
+        val refStart = when {
+            firstEventMillis > 0L -> firstEventMillis
+            nowMillis > sevenAmMillis -> sevenAmMillis
+            else -> startOfDayMillis
+        }
+        val elapsedHours = max(1.0, (nowMillis - refStart) / 3_600_000.0)
+        return when {
+            pickups > 0 -> max(1, (pickups / elapsedHours).roundToInt())
+            totalMinutes > 0 -> max(1, (appsCount / elapsedHours).roundToInt())
+            else -> 0
+        }
     }
 
     private fun extractAppIconPngBytes(pm: PackageManager, pkgName: String): ByteArray? {
@@ -208,4 +317,3 @@ open class MainActivity : FlutterActivity() {
         return bmp
     }
 }
-
