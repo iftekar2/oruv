@@ -527,6 +527,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               await ScreenTimeService.requestAuthorization();
               await _refreshDailyScreenTime();
             },
+            onTap: () => _selectTab(2),
             onTapHeader: () => _selectTab(2),
           ),
 

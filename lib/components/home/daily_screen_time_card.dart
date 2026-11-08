@@ -39,6 +39,7 @@ class DailyScreenTimeCard extends StatelessWidget {
   final bool useNativeIosReport;
   final int? totalMinutes;
   final List<AppScreenTimeItem> apps;
+  final VoidCallback? onTap;
   final VoidCallback? onTapHeader;
   final VoidCallback? onConnect;
 
@@ -48,6 +49,7 @@ class DailyScreenTimeCard extends StatelessWidget {
     this.useNativeIosReport = false,
     this.totalMinutes,
     this.apps = const [],
+    this.onTap,
     this.onTapHeader,
     this.onConnect,
   });
@@ -60,39 +62,45 @@ class DailyScreenTimeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: _cardBorder, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          if (!isAuthorized)
-            _buildConnectPrompt()
-          else if (Platform.isIOS && useNativeIosReport)
-            _buildIosNativeReport()
-          else
-            _buildFlutterReport(),
-        ],
+    final handleTap = onTap ?? onTapHeader;
+
+    return GestureDetector(
+      onTap: handleTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: _cardBorder, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.035),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(handleTap),
+            if (!isAuthorized)
+              _buildConnectPrompt()
+            else if (Platform.isIOS && useNativeIosReport)
+              _buildIosNativeReport()
+            else
+              _buildFlutterReport(),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(VoidCallback? handleTap) {
     return GestureDetector(
-      onTap: onTapHeader,
+      onTap: handleTap,
       behavior: HitTestBehavior.opaque,
       child: Row(
         mainAxisSize: MainAxisSize.min,
