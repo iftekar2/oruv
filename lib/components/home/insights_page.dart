@@ -25,7 +25,7 @@ class _InsightsPageState extends State<InsightsPage> {
   static const Color _cardBorder = Color(0xFFEFEBE8);
   static const Color _cardBg = Colors.white;
   static const Color _emeraldGreen = Color(0xFF16654E);
-  static const Color _plumBarColor = Color(0xFF644C54);
+  static const Color _redBarColor = Color(0xFFE53935);
   static const Color _mintBarColor = Color(0xFF74C69D);
   static const Color _greyBarColor = Color(0xFF7E7777);
   static const Color _trackColor = Color(0xFFF3EBE9);
@@ -46,14 +46,14 @@ class _InsightsPageState extends State<InsightsPage> {
         id: 'sample_tiktok',
         name: 'TikTok',
         durationMinutes: 80, // 1h 20m
-        barColor: _plumBarColor,
+        barColor: _redBarColor,
         isDistracting: true,
       ),
       AppScreenTimeItem(
         id: 'sample_instagram',
         name: 'Instagram',
         durationMinutes: 79, // 1h 19m
-        barColor: _plumBarColor,
+        barColor: _redBarColor,
         isDistracting: true,
       ),
       AppScreenTimeItem(
@@ -96,7 +96,8 @@ class _InsightsPageState extends State<InsightsPage> {
       0,
       (sum, item) => sum + item.durationMinutes,
     );
-    final totalMins = (widget.screenTimeSnapshot?.totalMinutes != null &&
+    final totalMins =
+        (widget.screenTimeSnapshot?.totalMinutes != null &&
             widget.screenTimeSnapshot!.totalMinutes! > 0)
         ? widget.screenTimeSnapshot!.totalMinutes!
         : (distractingMins + otherMins);
@@ -104,8 +105,8 @@ class _InsightsPageState extends State<InsightsPage> {
     final maxAppMins = effectiveApps.isEmpty
         ? 1
         : effectiveApps
-            .map((e) => e.durationMinutes)
-            .reduce((a, b) => a > b ? a : b);
+              .map((e) => e.durationMinutes)
+              .reduce((a, b) => a > b ? a : b);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 36),
@@ -119,8 +120,9 @@ class _InsightsPageState extends State<InsightsPage> {
 
           // ─── 2. 3-COLUMN METRICS SUMMARY CARD ────────────────────────
           _buildMetricsSummaryCard(
-            distractionsDuration:
-                AppScreenTimeItem.formatMinutes(distractingMins),
+            distractionsDuration: AppScreenTimeItem.formatMinutes(
+              distractingMins,
+            ),
             timeSavedDuration: '1h 52m',
             pickupsPerHour: '4',
           ),
@@ -136,11 +138,11 @@ class _InsightsPageState extends State<InsightsPage> {
           _buildAppCard(
             apps: distractingApps,
             maxAppMinutes: maxAppMins,
-            defaultBarColor: _plumBarColor,
+            defaultBarColor: _redBarColor,
             emptyMessage: 'No distracting app activity recorded today.',
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 30),
 
           // ─── 4. OTHER APPS SECTION ───────────────────────────────────
           _buildSectionHeader(
@@ -170,7 +172,9 @@ class _InsightsPageState extends State<InsightsPage> {
   Widget _buildHeroHeader(int totalMinutes) {
     final trendText = _selectedGranularity == 'D'
         ? '1h 52m today'
-        : (_selectedGranularity == 'W' ? '12h 40m this week' : '48h 15m this month');
+        : (_selectedGranularity == 'W'
+              ? '12h 40m this week'
+              : '48h 15m this month');
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -252,7 +256,9 @@ class _InsightsPageState extends State<InsightsPage> {
                 vertical: 7.5,
               ),
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF262326) : Colors.transparent,
+                color: isSelected
+                    ? const Color(0xFF262326)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(18),
               ),
               alignment: Alignment.center,
@@ -296,11 +302,7 @@ class _InsightsPageState extends State<InsightsPage> {
               valueColor: _primaryText,
             ),
           ),
-          Container(
-            width: 1,
-            height: 28,
-            color: const Color(0xFFEFE8E5),
-          ),
+          Container(width: 1, height: 28, color: const Color(0xFFEFE8E5)),
           // Column 2: TIME SAVED
           Expanded(
             child: _buildMetricColumn(
@@ -309,11 +311,7 @@ class _InsightsPageState extends State<InsightsPage> {
               valueColor: _emeraldGreen,
             ),
           ),
-          Container(
-            width: 1,
-            height: 28,
-            color: const Color(0xFFEFE8E5),
-          ),
+          Container(width: 1, height: 28, color: const Color(0xFFEFE8E5)),
           // Column 3: PICKUPS/HR
           Expanded(
             child: _buildMetricColumn(
@@ -401,9 +399,7 @@ class _InsightsPageState extends State<InsightsPage> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-      decoration: const BoxDecoration(
-        color: Colors.transparent,
-      ),
+      decoration: const BoxDecoration(color: Colors.transparent),
       child: apps.isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -416,15 +412,14 @@ class _InsightsPageState extends State<InsightsPage> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: apps.length,
-              separatorBuilder: (_, __) => const Divider(
-                color: _dividerColor,
-                height: 22,
-                thickness: 1,
-              ),
+              separatorBuilder: (_, __) =>
+                  const Divider(color: _dividerColor, height: 22, thickness: 1),
               itemBuilder: (context, index) {
                 final item = apps[index];
-                final ratio =
-                    (item.durationMinutes / maxAppMinutes).clamp(0.06, 1.0);
+                final ratio = (item.durationMinutes / maxAppMinutes).clamp(
+                  0.06,
+                  1.0,
+                );
 
                 final isOruv = item.name.toLowerCase().contains('oruv');
                 final isSafari = item.name.toLowerCase().contains('safari');
@@ -468,11 +463,7 @@ class _InsightsPageState extends State<InsightsPage> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(
-              width: 38,
-              height: 38,
-              child: icon,
-            ),
+            SizedBox(width: 38, height: 38, child: icon),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
