@@ -11,5 +11,8 @@ struct ScreenTimeReportExtension: DeviceActivityReportExtension {
         InsightsActivityReport { configuration in
             InsightsActivityView(configuration: configuration)
         }
+        AnchorTimeSavedReport { configuration in
+            AnchorTimeSavedView(configuration: configuration)
+        }
     }
 }

@@ -308,6 +308,30 @@ struct NativeInsightsReportContainerView: View {
     .ignoresSafeArea(.all)
   }
 }
+
+/// Hosts Apple's `DeviceActivityReport` view for the Deep Work Anchor card's "On Track to Save" column.
+@available(iOS 16.0, *)
+struct NativeAnchorTimeSavedContainerView: View {
+  var body: some View {
+    let calendar = Calendar.current
+    let now = Date()
+    let startOfToday = calendar.startOfDay(for: now)
+    let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday.addingTimeInterval(-86400)
+    let interval = DateInterval(start: startOfYesterday, end: now)
+    let filter = DeviceActivityFilter(
+      segment: .daily(during: interval),
+      users: .all,
+      devices: .init([.iPhone, .iPad])
+    )
+    DeviceActivityReport(
+      DeviceActivityReport.Context("AnchorTimeSaved"),
+      filter: filter
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(Color.white)
+    .allowsHitTesting(false)
+  }
+}
 #endif
 
 class FamilyActivityPickerPlatformView: NSObject, FlutterPlatformView {
@@ -531,6 +555,47 @@ class InsightsActivityReportPlatformView: NSObject, FlutterPlatformView {
       let swiftUIView = NativeInsightsReportContainerView()
       let hosting = UIHostingController(rootView: swiftUIView)
       hosting.view.isUserInteractionEnabled = true
+      if #available(iOS 16.4, *) {
+        hosting.safeAreaRegions = []
+      }
+      hosting.view.backgroundColor = .white
+      hosting.view.clipsToBounds = true
+      hosting.view.insetsLayoutMarginsFromSafeArea = false
+      hosting.view.translatesAutoresizingMaskIntoConstraints = false
+      self.containerView.addSubview(hosting.view)
+
+      NSLayoutConstraint.activate([
+        hosting.view.topAnchor.constraint(equalTo: self.containerView.topAnchor),
+        hosting.view.bottomAnchor.constraint(equalTo: self.containerView.bottomAnchor),
+        hosting.view.leadingAnchor.constraint(equalTo: self.containerView.leadingAnchor),
+        hosting.view.trailingAnchor.constraint(equalTo: self.containerView.trailingAnchor)
+      ])
+      self.hostingController = hosting
+    }
+    #endif
+  }
+
+  func view() -> UIView {
+    return containerView
+  }
+}
+
+class AnchorTimeSavedPlatformView: NSObject, FlutterPlatformView {
+  private let containerView: UIView
+  private var hostingController: UIViewController?
+
+  init(frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) {
+    self.containerView = UIView(frame: frame)
+    self.containerView.backgroundColor = .white
+    self.containerView.clipsToBounds = true
+    self.containerView.isUserInteractionEnabled = false
+    super.init()
+
+    #if canImport(DeviceActivity)
+    if #available(iOS 16.0, *) {
+      let swiftUIView = NativeAnchorTimeSavedContainerView()
+      let hosting = UIHostingController(rootView: swiftUIView)
+      hosting.view.isUserInteractionEnabled = false
       if #available(iOS 16.4, *) {
         hosting.safeAreaRegions = []
       }
@@ -1091,6 +1156,31 @@ class InsightsActivityReportFactory: NSObject, FlutterPlatformViewFactory {
     return FlutterStandardMessageCodec.sharedInstance()
   }
 }
+
+class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
+  private let messenger: FlutterBinaryMessenger
+
+  init(messenger: FlutterBinaryMessenger) {
+    self.messenger = messenger
+    super.init()
+  }
+
+  func create(
+    withFrame frame: CGRect,
+    viewIdentifier viewId: Int64,
+    arguments args: Any?
+  ) -> FlutterPlatformView {
+    return AnchorTimeSavedPlatformView(
+      frame: frame,
+      viewIdentifier: viewId,
+      arguments: args
+    )
+  }
+
+  func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
+    return FlutterStandardMessageCodec.sharedInstance()
+  }
+}
 #endif
 
 @main
@@ -1127,6 +1217,9 @@ class InsightsActivityReportFactory: NSObject, FlutterPlatformViewFactory {
 
         let insightsReportFactory = InsightsActivityReportFactory(messenger: registrar.messenger())
         registrar.register(insightsReportFactory, withId: "oruv/insights_activity_report")
+
+        let anchorTimeSavedFactory = AnchorTimeSavedFactory(messenger: registrar.messenger())
+        registrar.register(anchorTimeSavedFactory, withId: "oruv/anchor_time_saved")
 
         let mostBlockedTitleFactory = MostBlockedAppTitleFactory(messenger: registrar.messenger())
         registrar.register(mostBlockedTitleFactory, withId: "oruv/most_blocked_app_title")

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -16,6 +17,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
   final String? sessionRemaining;
   final String? protectedToday;
   final String? screenTimeToday;
+  final bool isAuthorized;
   final bool isSavingTime;
   final String? projectedTimeText;
   final String? projectedLabel;
@@ -41,6 +43,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
     this.sessionRemaining,
     this.protectedToday,
     this.screenTimeToday,
+    this.isAuthorized = false,
     this.isSavingTime = true,
     this.projectedTimeText,
     this.projectedLabel,
@@ -221,22 +224,32 @@ class DeepWorkAnchorCard extends StatelessWidget {
               ),
               Container(width: 1, height: 38, color: const Color(0xFFEEEAE6)),
               Expanded(
-                child: _buildMetricColumn(
-                  value:
-                      projectedTimeText ?? (protectedToday ?? focusedDuration),
-                  label:
-                      projectedLabel ??
-                      (isSavingTime ? 'On Track to Save' : 'Projected Over'),
-                  valueColor: isSavingTime ? _accentGreen : _coralRed,
-
-                  prefixIcon: Icon(
-                    isSavingTime
-                        ? Icons.arrow_drop_down_sharp
-                        : Icons.arrow_drop_up_sharp,
-                    size: 25,
-                    color: isSavingTime ? _accentGreen : _coralRed,
-                  ),
-                ),
+                child: (Platform.isIOS && isAuthorized)
+                    ? const SizedBox(
+                        height: 48,
+                        child: UiKitView(
+                          viewType: 'oruv/anchor_time_saved',
+                          creationParamsCodec: StandardMessageCodec(),
+                          hitTestBehavior:
+                              PlatformViewHitTestBehavior.transparent,
+                        ),
+                      )
+                    : _buildMetricColumn(
+                        value: projectedTimeText ??
+                            (protectedToday ?? focusedDuration),
+                        label: projectedLabel ??
+                            (isSavingTime
+                                ? 'On Track to Save'
+                                : 'Projected Over'),
+                        valueColor: isSavingTime ? _accentGreen : _coralRed,
+                        prefixIcon: Icon(
+                          isSavingTime
+                              ? Icons.arrow_drop_down_sharp
+                              : Icons.arrow_drop_up_sharp,
+                          size: 25,
+                          color: isSavingTime ? _accentGreen : _coralRed,
+                        ),
+                      ),
               ),
 
               Container(width: 1, height: 38, color: const Color(0xFFEEEAE6)),

@@ -7,7 +7,14 @@ import SwiftUI
 extension DeviceActivityReport.Context {
     static let dailyScreenTime = Self("DailyScreenTime")
     static let insightsScreenTime = Self("InsightsScreenTime")
+    static let anchorTimeSaved = Self("AnchorTimeSaved")
     static let totalActivity = Self("Total Activity")
+}
+
+struct AnchorTimeSavedConfiguration: Sendable {
+    let timeText: String
+    let label: String
+    let isSavingTime: Bool
 }
 
 struct AppActivityItem: Identifiable, Sendable {
@@ -452,6 +459,61 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
             pickupsPerHour: pickupsPerHour,
             distractingApps: distractingItems,
             otherApps: otherItems
+        )
+    }
+}
+
+nonisolated struct AnchorTimeSavedReport: DeviceActivityReportScene {
+    let context: DeviceActivityReport.Context = .anchorTimeSaved
+    let content: (AnchorTimeSavedConfiguration) -> AnchorTimeSavedView
+
+    func makeConfiguration(
+        representing data: DeviceActivityResults<DeviceActivityData>
+    ) async -> AnchorTimeSavedConfiguration {
+        let now = Date()
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+
+        var todayTotalSeconds: TimeInterval = 0
+        var yesterdayTotalSeconds: TimeInterval = 0
+
+        for await activityData in data {
+            for await segment in activityData.activitySegments {
+                let isToday = segment.dateInterval.end > startOfToday
+                if isToday {
+                    todayTotalSeconds += segment.totalActivityDuration
+                } else {
+                    yesterdayTotalSeconds += segment.totalActivityDuration
+                }
+            }
+        }
+
+        let todayMins = max(0, Int(todayTotalSeconds / 60))
+        let yesterdayMins = max(0, Int(yesterdayTotalSeconds / 60))
+
+        var baselineDailyMinutes = 300
+        let appGroupId = "group.app.iftekarhossain.oruv"
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+            let fileURL = containerURL.appendingPathComponent("insights_metrics.json")
+            if let jsonData = try? Data(contentsOf: fileURL),
+               let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                if let base = json["baselineMinutes"] as? Int, base > 0 {
+                    baselineDailyMinutes = base
+                }
+            }
+        }
+
+        let effectiveYesterdayMinutes = yesterdayMins > 0 ? yesterdayMins : baselineDailyMinutes
+        let diffMinutes = effectiveYesterdayMinutes - todayMins
+        let isSavingTime = diffMinutes >= 0
+        let absDiffMinutes = abs(diffMinutes)
+        let timeText = AppActivityItem.formatMinutes(absDiffMinutes)
+        let label = isSavingTime ? "On Track to Save" : "Projected Over"
+
+        return AnchorTimeSavedConfiguration(
+            timeText: timeText,
+            label: label,
+            isSavingTime: isSavingTime
         )
     }
 }

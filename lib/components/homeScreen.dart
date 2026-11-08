@@ -485,6 +485,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           DeepWorkAnchorCard(
             shieldLabel: snapshot.shieldLabel,
             title: snapshot.title,
+            isAuthorized: _screenTimeSnapshot?.isAuthorized ?? false,
             scheduleStart: snapshot.scheduleStart,
             scheduleEnd: snapshot.scheduleEnd,
             remainingCycleText: snapshot.remainingCycleText,
