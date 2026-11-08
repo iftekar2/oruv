@@ -212,9 +212,12 @@ class DeepWorkAnchorCard extends StatelessWidget {
           const Divider(color: Color(0xFFF1EDE9), height: 1, thickness: 1),
           const SizedBox(height: 18),
 
-          // 3-Column Metrics Row: Session Remaining, Projected Time Saved / Over vs Yesterday, Screen Time Today
+          // 3-Column Metrics Row: Session Remaining, Projected Time Saved, Urges Blocked
           Row(
+            crossAxisAlignment: CrossAxisAlignment
+                .start, // Perfectly aligns all columns at the top
             children: [
+              // Column 1: Session Remaining
               Expanded(
                 child: _buildMetricColumn(
                   value: sessionRemaining ?? '0m',
@@ -222,47 +225,88 @@ class DeepWorkAnchorCard extends StatelessWidget {
                   valueColor: _primaryText,
                 ),
               ),
-              Container(width: 1, height: 38, color: const Color(0xFFEEEAE6)),
+
+              Container(width: 1, height: 45, color: const Color(0xFFEEEAE6)),
+
+              // Column 2: Projected / On Track to Save
               Expanded(
-                child: (Platform.isIOS && isAuthorized)
-                    ? const SizedBox(
-                        height: 48,
-                        child: UiKitView(
-                          viewType: 'oruv/anchor_time_saved',
-                          creationParamsCodec: StandardMessageCodec(),
-                          hitTestBehavior:
-                              PlatformViewHitTestBehavior.transparent,
-                        ),
-                      )
-                    : _buildMetricColumn(
-                        value: projectedTimeText ??
-                            (protectedToday ?? focusedDuration),
-                        label: projectedLabel ??
-                            (isSavingTime
-                                ? 'On Track to Save'
-                                : 'Projected Over'),
-                        valueColor: isSavingTime ? _accentGreen : _coralRed,
-                        prefixIcon: Icon(
-                          isSavingTime
-                              ? Icons.arrow_drop_down_sharp
-                              : Icons.arrow_drop_up_sharp,
-                          size: 25,
-                          color: isSavingTime ? _accentGreen : _coralRed,
-                        ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height:
+                          32, // Fixed height container to match top value line heights
+                      child: Center(
+                        child: (Platform.isIOS && isAuthorized)
+                            ? const UiKitView(
+                                viewType: 'oruv/anchor_time_saved',
+                                creationParamsCodec: StandardMessageCodec(),
+                                hitTestBehavior:
+                                    PlatformViewHitTestBehavior.transparent,
+                              )
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    isSavingTime
+                                        ? Icons.arrow_drop_down_sharp
+                                        : Icons.arrow_drop_up_sharp,
+                                    size: 25,
+                                    color: isSavingTime
+                                        ? _accentGreen
+                                        : _coralRed,
+                                  ),
+                                  Flexible(
+                                    child: Text(
+                                      projectedTimeText ??
+                                          (protectedToday ?? focusedDuration),
+                                      style: GoogleFonts.lora(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                        color: isSavingTime
+                                            ? _accentGreen
+                                            : _coralRed,
+                                        letterSpacing: -0.2,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      projectedLabel ??
+                          (isSavingTime
+                              ? 'On Track to Save'
+                              : 'Projected Over'),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _mutedText,
+                        height: 1.2,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
 
-              Container(width: 1, height: 38, color: const Color(0xFFEEEAE6)),
+              Container(width: 1, height: 45, color: const Color(0xFFEEEAE6)),
+
+              // Column 3: Urges / Most Blocked App
               Expanded(
                 child: _buildMetricColumn(
                   value: mostBlockedAppCount > 0
                       ? '${mostBlockedAppCount}X'
                       : '0',
-                  label: mostBlockedAppCount > 0
-                      ? (mostBlockedAppName.isNotEmpty
-                            ? '$mostBlockedAppName Blocked'
-                            : 'Urges Blocked')
-                      : 'Urges Blocked',
+                  label: 'Urges Blocked',
                   valueColor: _primaryText,
                   customLabelWidget: mostBlockedAppCount > 0
                       ? (mostBlockedAppName.isNotEmpty
@@ -272,7 +316,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
                                     TextSpan(
                                       text: mostBlockedAppName,
                                       style: const TextStyle(
-                                        fontSize: 11.5,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.w700,
                                         color: _primaryText,
                                         height: 1.2,
@@ -281,8 +325,8 @@ class DeepWorkAnchorCard extends StatelessWidget {
                                     TextSpan(
                                       text: ' Blocked',
                                       style: const TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w400,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
                                         color: _primaryText,
                                         height: 1.2,
                                       ),
@@ -296,7 +340,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
                             : (hasMostBlockedNativeToken && Platform.isIOS
                                   ? SizedBox(
                                       width: double.infinity,
-                                      height: 18,
+                                      height: 20,
                                       child: IgnorePointer(
                                         child: UiKitView(
                                           key: ValueKey<String>(
@@ -406,36 +450,46 @@ class DeepWorkAnchorCard extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (prefixIcon != null) ...[prefixIcon, const SizedBox(width: 2)],
-            Flexible(
-              child: Text(
-                value,
-                style: GoogleFonts.lora(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: valueColor,
-                  letterSpacing: -0.2,
+        // Fixed height container ensures the top values align perfectly across all columns
+        SizedBox(
+          height: 32,
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (prefixIcon != null) ...[
+                  prefixIcon,
+                  const SizedBox(width: 2),
+                ],
+                Flexible(
+                  child: Text(
+                    value,
+                    style: GoogleFonts.lora(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: valueColor,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              ],
             ),
-          ],
+          ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
         if (customLabelWidget != null)
           customLabelWidget
         else
           Text(
             label,
+            // Updated to match the exact font styling, size, and weight of "On Track to Save"
             style: GoogleFonts.lora(
               fontSize: 11,
-              fontWeight: FontWeight.w400,
+              fontWeight: FontWeight.w600,
               color: _mutedText,
               height: 1.2,
             ),
@@ -447,6 +501,58 @@ class DeepWorkAnchorCard extends StatelessWidget {
     );
   }
 }
+
+//  Widget _buildMetricColumn({
+//     required String value,
+//     required String label,
+//     required Color valueColor,
+//     Widget? prefixIcon,
+//     Widget? customLabelWidget,
+//   }) {
+//     return Column(
+//       mainAxisSize: MainAxisSize.min,
+//       children: [
+//         Row(
+//           mainAxisSize: MainAxisSize.min,
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           crossAxisAlignment: CrossAxisAlignment.center,
+//           children: [
+//             if (prefixIcon != null) ...[prefixIcon, const SizedBox(width: 2)],
+//             Flexible(
+//               child: Text(
+//                 value,
+//                 style: GoogleFonts.lora(
+//                   fontSize: 20,
+//                   fontWeight: FontWeight.w700,
+//                   color: valueColor,
+//                   letterSpacing: -0.2,
+//                 ),
+//                 maxLines: 1,
+//                 overflow: TextOverflow.ellipsis,
+//               ),
+//             ),
+//           ],
+//         ),
+//         const SizedBox(height: 5),
+//         if (customLabelWidget != null)
+//           customLabelWidget
+//         else
+//           Text(
+//             label,
+//             style: GoogleFonts.lora(
+//               fontSize: 11,
+//               fontWeight: FontWeight.w400,
+//               color: _mutedText,
+//               height: 1.2,
+//             ),
+//             textAlign: TextAlign.center,
+//             maxLines: 2,
+//             overflow: TextOverflow.ellipsis,
+//           ),
+//       ],
+//     );
+//   }
+// }
 
 class _AnchorProgressRingPainter extends CustomPainter {
   final double progress;
