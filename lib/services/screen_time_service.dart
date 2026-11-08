@@ -50,11 +50,40 @@ class ScreenTimeService {
     try {
       if (Platform.isIOS) {
         final res = await _channel
-            .invokeMapMethod<String, dynamic>('checkAuthorizationStatus');
+            .invokeMapMethod<String, dynamic>('getDailyScreenTime');
         final authorized = res?['authorized'] == true;
+        if (!authorized) return DailyScreenTimeSnapshot.unavailable;
+
+        final rawTotal = (res?['totalMinutes'] as num?)?.toInt() ?? 0;
+        final rawApps = res?['apps'];
+        final parsedApps = <AppScreenTimeItem>[];
+
+        if (rawApps is List) {
+          for (int i = 0; i < rawApps.length; i++) {
+            final entry = rawApps[i];
+            if (entry is! Map) continue;
+            final map = Map<String, dynamic>.from(entry);
+            final name = (map['name'] ?? 'App').toString();
+            final isDistracting = map['isDistracting'] == true;
+            final mins = (map['durationMinutes'] as num?)?.toInt() ?? 0;
+
+            parsedApps.add(
+              AppScreenTimeItem(
+                id: 'ios_app_$i',
+                name: name,
+                durationMinutes: mins,
+                barColor: isDistracting ? _coralPink : _emeraldGreen,
+                isDistracting: isDistracting,
+              ),
+            );
+          }
+        }
+
         return DailyScreenTimeSnapshot(
-          isAuthorized: authorized,
-          useNativeIosReport: authorized,
+          isAuthorized: true,
+          totalMinutes: rawTotal,
+          apps: parsedApps,
+          useNativeIosReport: true,
         );
       }
 

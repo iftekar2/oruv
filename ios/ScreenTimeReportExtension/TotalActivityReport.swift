@@ -87,6 +87,26 @@ nonisolated struct TotalActivityReport: DeviceActivityReportScene {
         let sharedDefaults = UserDefaults(suiteName: "group.app.iftekarhossain.oruv")
         sharedDefaults?.set(totalMinutes, forKey: "oruv_daily_total_minutes")
 
+        // Read selected distracting apps from UserDefaults
+        var distractingTokens: Set<ApplicationToken> = []
+        if let selData = sharedDefaults?.data(forKey: "oruv_family_activity_selection"),
+           let selection = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: selData) {
+            distractingTokens = selection.applicationTokens
+        }
+
+        var appArray: [[String: Any]] = []
+        for (token, info) in appDurations {
+            let durationMins = max(1, Int(info.seconds / 60))
+            let isDistracting = distractingTokens.contains(token)
+            appArray.append([
+                "name": info.name,
+                "durationMinutes": durationMins,
+                "isDistracting": isDistracting
+            ])
+        }
+        appArray.sort { ($0["durationMinutes"] as? Int ?? 0) > ($1["durationMinutes"] as? Int ?? 0) }
+        sharedDefaults?.set(appArray, forKey: "oruv_daily_apps")
+
         // Persist known app names to the shared App Group for blocked attempts resolution
         var tokenNameDict: [String: String] = (sharedDefaults?.dictionary(forKey: "oruv_blocked_token_names") as? [String: String]) ?? [:]
         for (token, info) in appDurations {

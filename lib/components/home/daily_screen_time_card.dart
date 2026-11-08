@@ -12,6 +12,7 @@ class AppScreenTimeItem {
 
   /// Raw PNG bytes extracted from the OS (Android PackageManager).
   final Uint8List? iconBytes;
+  final bool isDistracting;
 
   const AppScreenTimeItem({
     required this.id,
@@ -19,6 +20,7 @@ class AppScreenTimeItem {
     required this.durationMinutes,
     required this.barColor,
     this.iconBytes,
+    this.isDistracting = false,
   });
 
   String get formattedDuration => formatMinutes(durationMinutes);

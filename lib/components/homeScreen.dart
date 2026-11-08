@@ -7,6 +7,7 @@ import 'package:oruv/components/home/daily_screen_time_card.dart';
 import 'package:oruv/components/home/deep_work_anchor_card.dart';
 import 'package:oruv/components/home/home_bottom_nav_bar.dart';
 import 'package:oruv/components/home/home_top_app_bar.dart';
+import 'package:oruv/components/home/insights_page.dart';
 import 'package:oruv/components/home/mindful_break_sheet.dart';
 import 'package:oruv/components/home/models/home_models.dart';
 import 'package:oruv/components/home/rule_editor_sheet.dart';
@@ -458,7 +459,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           onAddRule: _openAddRuleSheet,
         );
       case 2:
-        return _buildInsightsTabPlaceholder(snapshot);
+        return InsightsPage(
+          screenTimeSnapshot: _screenTimeSnapshot,
+          onConnectScreenTime: () async {
+            await ScreenTimeService.requestAuthorization();
+            await _refreshDailyScreenTime();
+          },
+        );
       default:
         return _buildHomeDashboard(snapshot);
     }
