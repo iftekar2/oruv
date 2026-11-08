@@ -1,9 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/home/daily_screen_time_card.dart';
-import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/services/screen_time_service.dart';
 
 class InsightsPage extends StatefulWidget {
@@ -21,54 +18,18 @@ class InsightsPage extends StatefulWidget {
 }
 
 class _InsightsPageState extends State<InsightsPage> {
-  DateTime _selectedDate = DateTime.now();
   String _selectedGranularity = 'D'; // 'D', 'W', 'M'
 
-  static const Color _bgCream = Color(0xFFFDFCF9);
-  static const Color _cardBg = Colors.white;
   static const Color _primaryText = Color(0xFF1B1B1D);
   static const Color _mutedText = Color(0xFF6E6A6E);
-  static const Color _cardBorder = Color(0xFFECE8E4);
-  static const Color _emeraldGreen = Color(0xFF1D6F58);
-  static const Color _coralPink = Color(0xFFD46250);
-  static const Color _trackColor = Color(0xFFF3ECEB);
-
-  bool get _isToday {
-    final now = DateTime.now();
-    return _selectedDate.year == now.year &&
-        _selectedDate.month == now.month &&
-        _selectedDate.day == now.day;
-  }
-
-  bool get _isYesterday {
-    final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    return _selectedDate.year == yesterday.year &&
-        _selectedDate.month == yesterday.month &&
-        _selectedDate.day == yesterday.day;
-  }
-
-  String get _dateTitle {
-    if (_isToday) return 'Today';
-    if (_isYesterday) return 'Yesterday';
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return '${months[_selectedDate.month - 1]} ${_selectedDate.day}';
-  }
-
-  void _previousDay() {
-    setState(() {
-      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
-    });
-  }
-
-  void _nextDay() {
-    if (_isToday) return;
-    setState(() {
-      _selectedDate = _selectedDate.add(const Duration(days: 1));
-    });
-  }
+  static const Color _cardBorder = Color(0xFFEFEBE8);
+  static const Color _cardBg = Colors.white;
+  static const Color _emeraldGreen = Color(0xFF16654E);
+  static const Color _plumBarColor = Color(0xFF644C54);
+  static const Color _mintBarColor = Color(0xFF74C69D);
+  static const Color _greyBarColor = Color(0xFF7E7777);
+  static const Color _trackColor = Color(0xFFF3EBE9);
+  static const Color _dividerColor = Color(0xFFF4EFEA);
 
   List<AppScreenTimeItem> _getDistractingApps(List<AppScreenTimeItem> allApps) {
     return allApps.where((a) => a.isDistracting).toList();
@@ -78,22 +39,21 @@ class _InsightsPageState extends State<InsightsPage> {
     return allApps.where((a) => !a.isDistracting).toList();
   }
 
-  /// Default fallback apps shown when no real app activity is cached yet
-  /// so the screen looks alive and matches the reference design.
+  /// Exact sample apps from the design screenshot when no usage is cached yet
   List<AppScreenTimeItem> _buildSampleApps() {
     return const [
       AppScreenTimeItem(
         id: 'sample_tiktok',
         name: 'TikTok',
         durationMinutes: 80, // 1h 20m
-        barColor: _coralPink,
+        barColor: _plumBarColor,
         isDistracting: true,
       ),
       AppScreenTimeItem(
         id: 'sample_instagram',
         name: 'Instagram',
         durationMinutes: 79, // 1h 19m
-        barColor: _coralPink,
+        barColor: _plumBarColor,
         isDistracting: true,
       ),
       AppScreenTimeItem(
@@ -107,28 +67,14 @@ class _InsightsPageState extends State<InsightsPage> {
         id: 'sample_safari',
         name: 'Safari',
         durationMinutes: 49,
-        barColor: _emeraldGreen,
+        barColor: _mintBarColor,
         isDistracting: false,
       ),
       AppScreenTimeItem(
         id: 'sample_snkrs',
-        name: 'Nike SNKRS',
+        name: 'Nike SNKRS: Sneakers & Apparel',
         durationMinutes: 9,
-        barColor: _emeraldGreen,
-        isDistracting: false,
-      ),
-      AppScreenTimeItem(
-        id: 'sample_photos',
-        name: 'Photos',
-        durationMinutes: 5,
-        barColor: _emeraldGreen,
-        isDistracting: false,
-      ),
-      AppScreenTimeItem(
-        id: 'sample_other',
-        name: 'Other',
-        durationMinutes: 16,
-        barColor: _emeraldGreen,
+        barColor: _greyBarColor,
         isDistracting: false,
       ),
     ];
@@ -155,457 +101,471 @@ class _InsightsPageState extends State<InsightsPage> {
         ? widget.screenTimeSnapshot!.totalMinutes!
         : (distractingMins + otherMins);
 
-    // Max duration for proportional bar lengths across all apps
     final maxAppMins = effectiveApps.isEmpty
         ? 1
         : effectiveApps
             .map((e) => e.durationMinutes)
             .reduce((a, b) => a > b ? a : b);
 
-    return Scaffold(
-      backgroundColor: _bgCream,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Top Bar: Date Scrubber + Granularity Pill (D W M)
-              _buildTopBar(),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 36),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ─── 1. TOP HERO: Screen Time + Granularity Switcher ────────
+          _buildHeroHeader(totalMins),
 
-              const SizedBox(height: 22),
+          const SizedBox(height: 22),
 
-              // 2. Hero Screen Time Metric & Savings Badge
-              _buildHeroMetric(totalMins),
-
-              const SizedBox(height: 24),
-
-              // 3. Distracting Apps Section
-              _buildSectionCard(
-                title: 'DISTRACTING APPS',
-                totalMinutes: distractingMins,
-                accentColor: _coralPink,
-                apps: distractingApps,
-                maxAppMinutes: maxAppMins,
-                emptyLabel: 'No distracting app usage recorded today.',
-              ),
-
-              const SizedBox(height: 18),
-
-              // 4. Other Apps Section
-              _buildSectionCard(
-                title: 'OTHER APPS',
-                totalMinutes: otherMins,
-                accentColor: _emeraldGreen,
-                apps: otherApps,
-                maxAppMinutes: maxAppMins,
-                emptyLabel: 'No other app usage recorded today.',
-                bundleTailApps: true,
-              ),
-
-              const SizedBox(height: 24),
-
-              // Connect prompt if not authorized
-              if (widget.screenTimeSnapshot?.isAuthorized != true) ...[
-                _buildAuthorizationPrompt(),
-                const SizedBox(height: 12),
-              ],
-            ],
+          // ─── 2. 3-COLUMN METRICS SUMMARY CARD ────────────────────────
+          _buildMetricsSummaryCard(
+            distractionsDuration:
+                AppScreenTimeItem.formatMinutes(distractingMins),
+            timeSavedDuration: '1h 52m',
+            pickupsPerHour: '4',
           ),
-        ),
+
+          const SizedBox(height: 26),
+
+          // ─── 3. DISTRACTING APPS SECTION ─────────────────────────────
+          _buildSectionHeader(
+            title: 'Distracting Apps',
+            durationText: AppScreenTimeItem.formatMinutes(distractingMins),
+          ),
+          const SizedBox(height: 12),
+          _buildAppCard(
+            apps: distractingApps,
+            maxAppMinutes: maxAppMins,
+            defaultBarColor: _plumBarColor,
+            emptyMessage: 'No distracting app activity recorded today.',
+          ),
+
+          const SizedBox(height: 26),
+
+          // ─── 4. PRODUCTIVE & OTHER SECTION ───────────────────────────
+          _buildSectionHeader(
+            title: 'Productive & Other',
+            durationText: AppScreenTimeItem.formatMinutes(otherMins),
+          ),
+          const SizedBox(height: 12),
+          _buildAppCard(
+            apps: otherApps,
+            maxAppMinutes: maxAppMins,
+            defaultBarColor: _emeraldGreen,
+            emptyMessage: 'No other app activity recorded today.',
+            isOtherSection: true,
+          ),
+
+          if (widget.screenTimeSnapshot?.isAuthorized != true) ...[
+            const SizedBox(height: 22),
+            _buildAuthorizationPrompt(),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildTopBar() {
+  // ─── HERO HEADER ─────────────────────────────────────────────────────────
+
+  Widget _buildHeroHeader(int totalMinutes) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Date Scrubber: ‹ Date ⌄ ›
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          decoration: BoxDecoration(
-            color: _cardBg,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: _cardBorder, width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.025),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Screen Time',
+              style: GoogleFonts.lora(
+                fontSize: 14,
+                color: _mutedText,
+                fontWeight: FontWeight.w500,
               ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left_rounded),
-                iconSize: 20,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              AppScreenTimeItem.formatMinutes(totalMinutes),
+              style: GoogleFonts.lora(
+                fontSize: 44,
+                fontWeight: FontWeight.w800,
                 color: _primaryText,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                splashRadius: 18,
-                onPressed: _previousDay,
+                letterSpacing: -1.0,
+                height: 1.05,
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    Text(
-                      _dateTitle,
-                      style: GoogleFonts.inter(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: _primaryText,
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 16,
-                      color: _mutedText,
-                    ),
-                  ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.arrow_downward_rounded,
+                  size: 14,
+                  color: _emeraldGreen,
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right_rounded),
-                iconSize: 20,
-                color: _isToday ? _mutedText.withValues(alpha: 0.35) : _primaryText,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                splashRadius: 18,
-                onPressed: _isToday ? null : _nextDay,
-              ),
-            ],
-          ),
+                const SizedBox(width: 3),
+                Text(
+                  '1h 52m today',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _emeraldGreen,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
 
-        // Segmented Granularity Pill: D  W  M
-        Container(
-          padding: const EdgeInsets.all(3.5),
-          decoration: BoxDecoration(
-            color: _cardBg,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: _cardBorder, width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.025),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: ['D', 'W', 'M'].map((granularity) {
-              final isSelected = _selectedGranularity == granularity;
-              return GestureDetector(
-                onTap: () {
-                  if (granularity != 'D') {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          granularity == 'W'
-                              ? 'Weekly view will be available in the next update.'
-                              : 'Monthly view will be available in the next update.',
-                        ),
-                        duration: const Duration(seconds: 2),
-                        backgroundColor: _emeraldGreen,
-                      ),
-                    );
-                    return;
-                  }
-                  setState(() => _selectedGranularity = granularity);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF131B26) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Text(
-                    granularity,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight:
-                          isSelected ? FontWeight.w700 : FontWeight.w600,
-                      color: isSelected ? Colors.white : _mutedText,
+        // Granularity Switcher: ( D )  W   M
+        _buildGranularityPill(),
+      ],
+    );
+  }
+
+  Widget _buildGranularityPill() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F6F4),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFEFE9E5), width: 1.1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: ['D', 'W', 'M'].map((granularity) {
+          final isSelected = _selectedGranularity == granularity;
+          return GestureDetector(
+            onTap: () {
+              if (granularity != 'D') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      granularity == 'W'
+                          ? 'Weekly view will be available in the next update.'
+                          : 'Monthly view will be available in the next update.',
                     ),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: _emeraldGreen,
                   ),
+                );
+                return;
+              }
+              setState(() => _selectedGranularity = granularity);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 5,
+              ),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF262326) : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                granularity,
+                style: GoogleFonts.lora(
+                  fontSize: 12.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? Colors.white : const Color(0xFF4A4A4A),
                 ),
-              );
-            }).toList(),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ─── 3-COLUMN METRICS SUMMARY CARD ───────────────────────────────────────
+
+  Widget _buildMetricsSummaryCard({
+    required String distractionsDuration,
+    required String timeSavedDuration,
+    required String pickupsPerHour,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDFBF9),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFF0EAE6), width: 1.2),
+      ),
+      child: Row(
+        children: [
+          // Column 1: DISTRACTIONS
+          Expanded(
+            child: _buildMetricColumn(
+              value: distractionsDuration,
+              label: 'DISTRACTIONS',
+              valueColor: _primaryText,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 28,
+            color: const Color(0xFFEFE8E5),
+          ),
+          // Column 2: TIME SAVED
+          Expanded(
+            child: _buildMetricColumn(
+              value: timeSavedDuration,
+              label: 'TIME SAVED',
+              valueColor: _emeraldGreen,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 28,
+            color: const Color(0xFFEFE8E5),
+          ),
+          // Column 3: PICKUPS/HR
+          Expanded(
+            child: _buildMetricColumn(
+              value: pickupsPerHour,
+              label: 'PICKUPS/HR',
+              valueColor: _primaryText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricColumn({
+    required String value,
+    required String label,
+    required Color valueColor,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.lora(
+            fontSize: 19,
+            fontWeight: FontWeight.w700,
+            color: valueColor,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+            color: _mutedText,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildHeroMetric(int totalMinutes) {
+  // ─── SECTION HEADER ──────────────────────────────────────────────────────
+
+  Widget _buildSectionHeader({
+    required String title,
+    required String durationText,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.lora(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: _primaryText,
+          ),
+        ),
+        Text(
+          durationText,
+          style: GoogleFonts.lora(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: _primaryText,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── SECTION CARD ────────────────────────────────────────────────────────
+
+  Widget _buildAppCard({
+    required List<AppScreenTimeItem> apps,
+    required int maxAppMinutes,
+    required Color defaultBarColor,
+    required String emptyMessage,
+    bool isOtherSection = false,
+  }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: _cardBg,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: _cardBorder, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
+      child: apps.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                emptyMessage,
+                style: GoogleFonts.lora(fontSize: 13, color: _mutedText),
+              ),
+            )
+          : ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: apps.length,
+              separatorBuilder: (_, __) => const Divider(
+                color: _dividerColor,
+                height: 26,
+                thickness: 1,
+              ),
+              itemBuilder: (context, index) {
+                final item = apps[index];
+                final ratio =
+                    (item.durationMinutes / maxAppMinutes).clamp(0.06, 1.0);
+
+                final isOruv = item.name.toLowerCase().contains('oruv');
+                final isSafari = item.name.toLowerCase().contains('safari');
+
+                // Bar color logic to match screenshot
+                Color barColor = defaultBarColor;
+                if (isOtherSection) {
+                  if (isOruv) {
+                    barColor = _emeraldGreen;
+                  } else if (isSafari) {
+                    barColor = _mintBarColor;
+                  } else {
+                    barColor = _greyBarColor;
+                  }
+                }
+
+                return _buildAppItem(
+                  icon: _buildAppIcon(item),
+                  title: item.name,
+                  subtitle: isOruv ? 'Deep Work' : null,
+                  durationText: item.formattedDuration,
+                  progressRatio: ratio,
+                  barColor: barColor,
+                );
+              },
+            ),
+    );
+  }
+
+  Widget _buildAppItem({
+    required Widget icon,
+    required String title,
+    String? subtitle,
+    required String durationText,
+    required double progressRatio,
+    required Color barColor,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 38,
+              height: 38,
+              child: icon,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    AppScreenTimeItem.formatMinutes(totalMinutes),
+                    title,
                     style: GoogleFonts.lora(
-                      fontSize: 36,
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: _primaryText,
-                      letterSpacing: -0.8,
-                      height: 1.1,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Screen Time',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: _mutedText,
-                    ),
-                  ),
-                ],
-              ),
-              // Trend indicator badge
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE6F5F0), // Soft mint tint
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: _emeraldGreen.withValues(alpha: 0.25),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.arrow_downward_rounded,
-                      size: 13,
-                      color: _emeraldGreen,
-                    ),
-                    const SizedBox(width: 4),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      '1h 52m today',
+                      subtitle,
                       style: GoogleFonts.inter(
                         fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w500,
                         color: _emeraldGreen,
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionCard({
-    required String title,
-    required int totalMinutes,
-    required Color accentColor,
-    required List<AppScreenTimeItem> apps,
-    required int maxAppMinutes,
-    required String emptyLabel,
-    bool bundleTailApps = false,
-  }) {
-    // Optionally bundle smaller tail apps into "Other"
-    List<AppScreenTimeItem> displayApps = List.from(apps);
-    if (bundleTailApps && displayApps.length > 5) {
-      final topApps = displayApps.take(4).toList();
-      final tailApps = displayApps.skip(4).toList();
-      final tailMins =
-          tailApps.fold<int>(0, (sum, a) => sum + a.durationMinutes);
-      topApps.add(
-        AppScreenTimeItem(
-          id: 'bundled_other',
-          name: 'Other',
-          durationMinutes: tailMins,
-          barColor: accentColor,
-          isDistracting: false,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              durationText,
+              style: GoogleFonts.lora(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: _primaryText,
+              ),
+            ),
+          ],
         ),
-      );
-      displayApps = topApps;
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
-      decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: _cardBorder, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+        const SizedBox(height: 10),
+        // Wide horizontal progress bar running across the full width
+        Container(
+          height: 7,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: _trackColor,
+            borderRadius: BorderRadius.circular(5),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section Header: Title + Subtotal
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                  color: accentColor,
-                ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: progressRatio,
+            child: Container(
+              decoration: BoxDecoration(
+                color: barColor,
+                borderRadius: BorderRadius.circular(5),
               ),
-              Text(
-                AppScreenTimeItem.formatMinutes(totalMinutes),
-                style: GoogleFonts.lora(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: _primaryText,
-                ),
-              ),
-            ],
+            ),
           ),
-
-          const SizedBox(height: 14),
-          const Divider(color: Color(0xFFF2EEEA), height: 1, thickness: 1),
-          const SizedBox(height: 10),
-
-          if (displayApps.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                emptyLabel,
-                style: GoogleFonts.lora(
-                  fontSize: 13,
-                  color: _mutedText,
-                ),
-              ),
-            )
-          else
-            ...displayApps.map((item) {
-              final ratio = (item.durationMinutes / maxAppMinutes).clamp(
-                0.08,
-                1.0,
-              );
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: SizedBox(
-                  height: 38,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // App Icon
-                      SizedBox(
-                        width: 32,
-                        height: 32,
-                        child: _buildAppIcon(item),
-                      ),
-                      const SizedBox(width: 12),
-
-                      // App Name
-                      SizedBox(
-                        width: 90,
-                        child: Text(
-                          item.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: _primaryText,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-
-                      // Horizontal Progress Bar
-                      Expanded(
-                        child: Container(
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: _trackColor,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: ratio,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: accentColor,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-
-                      // Duration text
-                      Text(
-                        item.formattedDuration,
-                        style: GoogleFonts.lora(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: item.isDistracting ? accentColor : _primaryText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-        ],
-      ),
+        ),
+      ],
     );
   }
+
+  // ─── APP ICONS ───────────────────────────────────────────────────────────
 
   Widget _buildAppIcon(AppScreenTimeItem item) {
     if (item.iconBytes != null && item.iconBytes!.isNotEmpty) {
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: const Color(0xFFECE8E4), width: 0.8),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(7),
+          borderRadius: BorderRadius.circular(9),
           child: Image.memory(
             item.iconBytes!,
             fit: BoxFit.cover,
@@ -621,67 +581,99 @@ class _InsightsPageState extends State<InsightsPage> {
   Widget _buildBrandOrMonogramIcon(String name) {
     final lower = name.toLowerCase();
 
+    // 1. TikTok: Black rounded box with "Tk"
     if (lower.contains('tiktok')) {
       return Container(
         decoration: BoxDecoration(
           color: Colors.black,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: const Icon(Icons.music_note_rounded, size: 18, color: Colors.white),
+        alignment: Alignment.center,
+        child: Text(
+          'Tk',
+          style: GoogleFonts.lora(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
       );
     }
 
+    // 2. Instagram: Orange/pink gradient with "Ig"
     if (lower.contains('instagram')) {
       return Container(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF833AB4), Color(0xFFFD1D1D), Color(0xFFFCB045)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            colors: [Color(0xFFFD1D1D), Color(0xFFE1306C), Color(0xFF833AB4)],
+            begin: Alignment.bottomLeft,
+            end: Alignment.topRight,
           ),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: const Icon(Icons.camera_alt_rounded, size: 17, color: Colors.white),
+        alignment: Alignment.center,
+        child: Text(
+          'Ig',
+          style: GoogleFonts.lora(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
       );
     }
 
+    // 3. Oruv: Cream box with green sailboat/shield icon
     if (lower.contains('oruv')) {
       return Container(
         decoration: BoxDecoration(
-          color: _emeraldGreen,
-          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFFF3EFEA),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE5DFD7), width: 0.8),
         ),
-        child: const Icon(Icons.shield_rounded, size: 17, color: Colors.white),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.sailing_rounded,
+          size: 20,
+          color: _emeraldGreen,
+        ),
       );
     }
 
+    // 4. Safari: Light blue tinted box with blue compass icon
     if (lower.contains('safari')) {
       return Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF007AFF),
-          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFFEBF4FF),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFD6E7FF), width: 0.8),
         ),
-        child: const Icon(Icons.explore_rounded, size: 18, color: Colors.white),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.explore_outlined,
+          size: 21,
+          color: Color(0xFF007AFF),
+        ),
       );
     }
 
-    if (lower.contains('photos')) {
+    // 5. Nike SNKRS: Red box with white "SNKRS"
+    if (lower.contains('snkrs') || lower.contains('nike')) {
       return Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFF39C12),
-          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFFE52E2E),
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: const Icon(Icons.photo_library_rounded, size: 17, color: Colors.white),
-      );
-    }
-
-    if (lower.contains('other')) {
-      return Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF2C3E50),
-          borderRadius: BorderRadius.circular(8),
+        alignment: Alignment.center,
+        child: Text(
+          'SNKRS',
+          style: GoogleFonts.inter(
+            fontSize: 7.5,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.4,
+            color: Colors.white,
+          ),
         ),
-        child: const Icon(Icons.more_horiz_rounded, size: 18, color: Colors.white),
       );
     }
 
@@ -689,19 +681,21 @@ class _InsightsPageState extends State<InsightsPage> {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFEEEBE7),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
       ),
       alignment: Alignment.center,
       child: Text(
         name.isNotEmpty ? name[0].toUpperCase() : '?',
-        style: GoogleFonts.inter(
-          fontSize: 13,
+        style: GoogleFonts.lora(
+          fontSize: 14,
           fontWeight: FontWeight.w700,
           color: _primaryText,
         ),
       ),
     );
   }
+
+  // ─── AUTHORIZATION PROMPT ────────────────────────────────────────────────
 
   Widget _buildAuthorizationPrompt() {
     return Container(
@@ -756,4 +750,3 @@ class _InsightsPageState extends State<InsightsPage> {
     );
   }
 }
-
