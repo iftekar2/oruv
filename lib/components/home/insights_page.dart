@@ -102,6 +102,10 @@ class _InsightsPageState extends State<InsightsPage> {
         ? widget.screenTimeSnapshot!.totalMinutes!
         : (distractingMins + otherMins);
 
+    final pctDistracted = totalMins > 0
+        ? ((distractingMins / totalMins) * 100).round().clamp(0, 100)
+        : 0;
+
     final maxAppMins = effectiveApps.isEmpty
         ? 1
         : effectiveApps
@@ -120,9 +124,7 @@ class _InsightsPageState extends State<InsightsPage> {
 
           // ─── 2. 3-COLUMN METRICS SUMMARY CARD ────────────────────────
           _buildMetricsSummaryCard(
-            distractionsDuration: AppScreenTimeItem.formatMinutes(
-              distractingMins,
-            ),
+            distractedPercentage: '$pctDistracted%',
             timeSavedDuration: '1h 52m',
             pickupsPerHour: '4',
           ),
@@ -170,12 +172,6 @@ class _InsightsPageState extends State<InsightsPage> {
   // ─── HERO HEADER ─────────────────────────────────────────────────────────
 
   Widget _buildHeroHeader(int totalMinutes) {
-    final trendText = _selectedGranularity == 'D'
-        ? '1h 52m today'
-        : (_selectedGranularity == 'W'
-              ? '12h 40m this week'
-              : '48h 15m this month');
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,31 +198,14 @@ class _InsightsPageState extends State<InsightsPage> {
                 height: 1.05,
               ),
             ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.arrow_downward_rounded,
-                  size: 14,
-                  color: _emeraldGreen,
-                ),
-                const SizedBox(width: 3),
-                Text(
-                  trendText,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: _emeraldGreen,
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
 
         // Granularity Switcher: ( D )  W   M
-        _buildGranularityPill(),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: _buildGranularityPill(),
+        ),
       ],
     );
   }
@@ -280,7 +259,7 @@ class _InsightsPageState extends State<InsightsPage> {
   // ─── 3-COLUMN METRICS SUMMARY CARD ───────────────────────────────────────
 
   Widget _buildMetricsSummaryCard({
-    required String distractionsDuration,
+    required String distractedPercentage,
     required String timeSavedDuration,
     required String pickupsPerHour,
   }) {
@@ -294,11 +273,11 @@ class _InsightsPageState extends State<InsightsPage> {
       ),
       child: Row(
         children: [
-          // Column 1: DISTRACTIONS
+          // Column 1: % DISTRACTED
           Expanded(
             child: _buildMetricColumn(
-              value: distractionsDuration,
-              label: 'DISTRACTIONS',
+              value: distractedPercentage,
+              label: 'Distracted',
               valueColor: _primaryText,
             ),
           ),
@@ -307,7 +286,7 @@ class _InsightsPageState extends State<InsightsPage> {
           Expanded(
             child: _buildMetricColumn(
               value: timeSavedDuration,
-              label: 'TIME SAVED',
+              label: 'Time Saved',
               valueColor: _emeraldGreen,
             ),
           ),
@@ -316,7 +295,7 @@ class _InsightsPageState extends State<InsightsPage> {
           Expanded(
             child: _buildMetricColumn(
               value: pickupsPerHour,
-              label: 'PICKUPS/HR',
+              label: 'Pickups/HR',
               valueColor: _primaryText,
             ),
           ),
