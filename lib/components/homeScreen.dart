@@ -96,6 +96,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {
         _screenTimeSnapshot = screenTime;
       });
+      await _syncShieldAndStats();
     } catch (e) {
       debugPrint('HomeScreen._refreshDailyScreenTime note: $e');
     }
@@ -413,10 +414,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  void _selectTab(int index) {
+    if (_currentTabIndex != index) {
+      setState(() {
+        _currentTabIndex = index;
+      });
+      _refreshDailyScreenTime();
+      _refreshBlockedAttempts();
+    }
+  }
+
   void _handleViewAllRules() {
-    setState(() {
-      _currentTabIndex = 1;
-    });
+    _selectTab(1);
   }
 
   @override
@@ -437,42 +446,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ? const Center(
                 child: CircularProgressIndicator(color: Color(0xFF1D6F58)),
               )
-            : _buildActiveTabBody(snapshot),
+            : IndexedStack(
+                index: _currentTabIndex,
+                children: [
+                  _buildHomeDashboard(snapshot),
+                  ShieldsPage(
+                    rules: _rules,
+                    onRuleToggled: _handleRuleToggled,
+                    onEditRule: _openEditRuleSheet,
+                    onAddRule: _openAddRuleSheet,
+                  ),
+                  InsightsPage(
+                    screenTimeSnapshot: _screenTimeSnapshot,
+                    timeSavedText: snapshot.projectedTimeText,
+                    onConnectScreenTime: () async {
+                      await ScreenTimeService.requestAuthorization();
+                      await _refreshDailyScreenTime();
+                    },
+                  ),
+                ],
+              ),
       ),
       bottomNavigationBar: HomeBottomNavBar(
         currentIndex: _currentTabIndex,
-        onTabSelected: (index) {
-          setState(() {
-            _currentTabIndex = index;
-          });
-        },
+        onTabSelected: _selectTab,
       ),
     );
-  }
-
-  Widget _buildActiveTabBody(LiveAnchorSnapshot snapshot) {
-    switch (_currentTabIndex) {
-      case 0:
-        return _buildHomeDashboard(snapshot);
-      case 1:
-        return ShieldsPage(
-          rules: _rules,
-          onRuleToggled: _handleRuleToggled,
-          onEditRule: _openEditRuleSheet,
-          onAddRule: _openAddRuleSheet,
-        );
-      case 2:
-        return InsightsPage(
-          screenTimeSnapshot: _screenTimeSnapshot,
-          timeSavedText: snapshot.projectedTimeText,
-          onConnectScreenTime: () async {
-            await ScreenTimeService.requestAuthorization();
-            await _refreshDailyScreenTime();
-          },
-        );
-      default:
-        return _buildHomeDashboard(snapshot);
-    }
   }
 
   Widget _buildHomeDashboard(LiveAnchorSnapshot snapshot) {
@@ -528,11 +527,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               await ScreenTimeService.requestAuthorization();
               await _refreshDailyScreenTime();
             },
-            onTapHeader: () {
-              setState(() {
-                _currentTabIndex = 2; // Navigate to Insights tab
-              });
-            },
+            onTapHeader: () => _selectTab(2),
           ),
 
           const SizedBox(height: 26),
