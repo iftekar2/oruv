@@ -10,6 +10,9 @@ class DailyScreenTimeSnapshot {
   /// Real total minutes for today. Null when the OS did not provide data.
   final int? totalMinutes;
 
+  /// Real total minutes for yesterday. Null when the OS did not provide data.
+  final int? yesterdayMinutes;
+
   /// Real pickups per hour for today.
   final int? pickupsPerHour;
 
@@ -23,6 +26,7 @@ class DailyScreenTimeSnapshot {
   const DailyScreenTimeSnapshot({
     required this.isAuthorized,
     this.totalMinutes,
+    this.yesterdayMinutes,
     this.pickupsPerHour,
     this.apps = const [],
     this.useNativeIosReport = false,
@@ -92,6 +96,7 @@ class ScreenTimeService {
         if (!authorized) return DailyScreenTimeSnapshot.unavailable;
 
         final rawTotal = (res?['totalMinutes'] as num?)?.toInt() ?? 0;
+        final rawYesterday = (res?['yesterdayTotalMinutes'] as num?)?.toInt();
         final rawPickups = (res?['pickupsPerHour'] as num?)?.toInt();
         final rawApps = res?['apps'];
         final parsedApps = <AppScreenTimeItem>[];
@@ -122,6 +127,7 @@ class ScreenTimeService {
         return DailyScreenTimeSnapshot(
           isAuthorized: true,
           totalMinutes: rawTotal,
+          yesterdayMinutes: rawYesterday,
           pickupsPerHour: rawPickups,
           apps: parsedApps,
           useNativeIosReport: true,
@@ -139,6 +145,7 @@ class ScreenTimeService {
       if (!authorized) return DailyScreenTimeSnapshot.unavailable;
 
       final rawTotal = (res['totalMinutes'] as num?)?.toInt() ?? 0;
+      final rawYesterday = (res['yesterdayTotalMinutes'] as num?)?.toInt();
       final rawPickups = (res['pickupsPerHour'] as num?)?.toInt() ?? 0;
       final rawApps = res['apps'];
       final parsedApps = <AppScreenTimeItem>[];
@@ -179,6 +186,7 @@ class ScreenTimeService {
       return DailyScreenTimeSnapshot(
         isAuthorized: true,
         totalMinutes: rawTotal,
+        yesterdayMinutes: rawYesterday,
         pickupsPerHour: rawPickups,
         apps: parsedApps,
       );

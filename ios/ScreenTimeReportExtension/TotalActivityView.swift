@@ -126,7 +126,7 @@ struct InsightsActivityView: View {
                     isOtherSection: false,
                     emptyMessage: "No distracting app activity recorded today."
                 )
-                .padding(.bottom, 16)
+                .padding(.bottom, 36)
 
                 // ─── 4. OTHER APPS SECTION ───────────────────────────────────
                 sectionHeader(
@@ -210,7 +210,7 @@ struct InsightsActivityView: View {
         HStack(spacing: 0) {
             metricColumn(
                 value: "\(configuration.distractedPercentage)%",
-                label: "% DISTRACTED",
+                label: "Distracted",
                 valueColor: primaryText
             )
             .frame(maxWidth: .infinity)
@@ -221,8 +221,8 @@ struct InsightsActivityView: View {
 
             metricColumn(
                 value: configuration.timeSavedText,
-                label: "TIME SAVED",
-                valueColor: emeraldGreen
+                label: configuration.timeSavedLabel,
+                valueColor: configuration.isSavingTime ? emeraldGreen : redBarColor
             )
             .frame(maxWidth: .infinity)
 
@@ -232,7 +232,7 @@ struct InsightsActivityView: View {
 
             metricColumn(
                 value: "\(configuration.pickupsPerHour)",
-                label: "PICKUPS/HR",
+                label: "Pickups/HR",
                 valueColor: primaryText
             )
             .frame(maxWidth: .infinity)
@@ -257,8 +257,8 @@ struct InsightsActivityView: View {
                 .lineLimit(1)
 
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(0.8)
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(0.2)
                 .foregroundColor(mutedText)
                 .lineLimit(1)
         }

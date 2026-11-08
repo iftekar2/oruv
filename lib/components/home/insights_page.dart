@@ -58,7 +58,7 @@ class _InsightsPageState extends State<InsightsPage> {
         .toList();
   }
 
-  String _computeDynamicTimeSaved(int distractingMins) {
+  (String, String, bool) _computeDynamicTimeSaved(int totalMins) {
     int baselineMinutes = 300;
     final choice = OnboardingData.instance.dailyScreenTime;
     if (choice == '< 2 hours') {
@@ -71,16 +71,18 @@ class _InsightsPageState extends State<InsightsPage> {
       baselineMinutes = 480;
     }
 
-    final now = DateTime.now();
-    final minsSinceMidnight = now.hour * 60 + now.minute;
-    final wakingElapsedMins = (minsSinceMidnight - 420).clamp(30, 960);
-    final expectedDistractingSoFar =
-        (baselineMinutes * (wakingElapsedMins / 960.0) * 0.65).round();
-    final savedMinutes = math.max(0, expectedDistractingSoFar - distractingMins);
-    if (savedMinutes > 0) {
-      return AppScreenTimeItem.formatMinutes(savedMinutes);
-    }
-    return widget.timeSavedText ?? '0m';
+    final yesterdayMins =
+        widget.screenTimeSnapshot?.yesterdayMinutes != null &&
+            widget.screenTimeSnapshot!.yesterdayMinutes! > 0
+        ? widget.screenTimeSnapshot!.yesterdayMinutes!
+        : baselineMinutes;
+
+    final diff = yesterdayMins - totalMins;
+    final isSavingTime = diff >= 0;
+    final absDiff = diff.abs();
+    final timeText = AppScreenTimeItem.formatMinutes(absDiff);
+    final label = isSavingTime ? 'Time Saved' : 'Over Yest.';
+    return (timeText, label, isSavingTime);
   }
 
   @override
@@ -127,7 +129,8 @@ class _InsightsPageState extends State<InsightsPage> {
 
     final pickupsPerHour =
         widget.screenTimeSnapshot?.pickupsPerHour ?? (totalMins > 0 ? 1 : 0);
-    final timeSavedText = _computeDynamicTimeSaved(distractingMins);
+    final (timeSavedText, timeSavedLabel, isSavingTime) =
+        _computeDynamicTimeSaved(totalMins);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 36),
@@ -148,6 +151,8 @@ class _InsightsPageState extends State<InsightsPage> {
           _buildMetricsSummaryCard(
             distractedPercentage: '$pctDistracted%',
             timeSavedDuration: timeSavedText,
+            timeSavedLabel: timeSavedLabel,
+            isSavingTime: isSavingTime,
             pickupsPerHour: '$pickupsPerHour',
           ),
 
@@ -166,7 +171,7 @@ class _InsightsPageState extends State<InsightsPage> {
             emptyMessage: 'No distracting app activity recorded today.',
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 50),
 
           // ─── 4. OTHER APPS SECTION ───────────────────────────────────
           _buildSectionHeader(
@@ -278,6 +283,8 @@ class _InsightsPageState extends State<InsightsPage> {
   Widget _buildMetricsSummaryCard({
     required String distractedPercentage,
     required String timeSavedDuration,
+    required String timeSavedLabel,
+    required bool isSavingTime,
     required String pickupsPerHour,
   }) {
     return Container(
@@ -290,11 +297,11 @@ class _InsightsPageState extends State<InsightsPage> {
       ),
       child: Row(
         children: [
-          // Column 1: % DISTRACTED
+          // Column 1: Distracted
           Expanded(
             child: _buildMetricColumn(
               value: distractedPercentage,
-              label: '% DISTRACTED',
+              label: 'Distracted',
               valueColor: _primaryText,
             ),
           ),
@@ -303,8 +310,8 @@ class _InsightsPageState extends State<InsightsPage> {
           Expanded(
             child: _buildMetricColumn(
               value: timeSavedDuration,
-              label: 'TIME SAVED',
-              valueColor: _emeraldGreen,
+              label: timeSavedLabel,
+              valueColor: isSavingTime ? _emeraldGreen : _redBarColor,
             ),
           ),
           Container(width: 1, height: 28, color: const Color(0xFFEFE8E5)),
@@ -312,7 +319,7 @@ class _InsightsPageState extends State<InsightsPage> {
           Expanded(
             child: _buildMetricColumn(
               value: pickupsPerHour,
-              label: 'PICKUPS/HR',
+              label: 'Pickups/HR',
               valueColor: _primaryText,
             ),
           ),

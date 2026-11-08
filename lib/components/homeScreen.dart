@@ -119,6 +119,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final snapshot = ScheduleService.computeLiveSnapshot(
       rules: _rules,
       mindfulBreakMinutesToday: _mindfulBreakMinutesToday,
+      todayScreenTimeMinutes: _screenTimeSnapshot?.totalMinutes,
+      yesterdayScreenTimeMinutes: _screenTimeSnapshot?.yesterdayMinutes,
     );
 
     final sessionRemaining = snapshot.activeRule != null
@@ -422,6 +424,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final snapshot = ScheduleService.computeLiveSnapshot(
       rules: _rules,
       mindfulBreakMinutesToday: _mindfulBreakMinutesToday,
+      todayScreenTimeMinutes: _screenTimeSnapshot?.totalMinutes,
+      yesterdayScreenTimeMinutes: _screenTimeSnapshot?.yesterdayMinutes,
     );
 
     return Scaffold(

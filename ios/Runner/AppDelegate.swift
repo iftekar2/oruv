@@ -289,8 +289,11 @@ struct NativeDeviceActivityReportContainerView: View {
 @available(iOS 16.0, *)
 struct NativeInsightsReportContainerView: View {
   var body: some View {
-    let startOfDay = Calendar.current.startOfDay(for: Date())
-    let interval = DateInterval(start: startOfDay, end: Date())
+    let calendar = Calendar.current
+    let now = Date()
+    let startOfToday = calendar.startOfDay(for: now)
+    let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday.addingTimeInterval(-86400)
+    let interval = DateInterval(start: startOfYesterday, end: now)
     let filter = DeviceActivityFilter(
       segment: .daily(during: interval),
       users: .all,
@@ -1309,6 +1312,7 @@ class InsightsActivityReportFactory: NSObject, FlutterPlatformViewFactory {
             let domainsCount = ScreenTimeManager.shared.activitySelection.webDomainTokens.count
             let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
             let cachedTotalMinutes = sharedDefaults?.integer(forKey: "oruv_daily_total_minutes") ?? 0
+            let cachedYesterdayMinutes = sharedDefaults?.integer(forKey: "oruv_yesterday_total_minutes") ?? 0
             let cachedApps = (sharedDefaults?.array(forKey: "oruv_daily_apps") as? [[String: Any]]) ?? []
 
             result([
@@ -1317,6 +1321,7 @@ class InsightsActivityReportFactory: NSObject, FlutterPlatformViewFactory {
               "categoriesCount": categoriesCount,
               "domainsCount": domainsCount,
               "totalMinutes": cachedTotalMinutes,
+              "yesterdayTotalMinutes": cachedYesterdayMinutes,
               "apps": cachedApps
             ])
           case "applyShield":

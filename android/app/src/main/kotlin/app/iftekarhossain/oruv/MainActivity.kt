@@ -187,12 +187,23 @@ open class MainActivity : FlutterActivity() {
             set(Calendar.MILLISECOND, 0)
         }
         val startOfDayMillis = calendar.timeInMillis
+        val startOfYesterdayMillis = startOfDayMillis - 86_400_000L
         val nowMillis = System.currentTimeMillis()
 
         val aggregatedStats = usageStatsManager.queryAndAggregateUsageStats(
             startOfDayMillis,
             nowMillis
         )
+        val aggregatedYesterday = usageStatsManager.queryAndAggregateUsageStats(
+            startOfYesterdayMillis,
+            startOfDayMillis
+        )
+
+        var yesterdayForegroundMillis = 0L
+        for ((_, stats) in aggregatedYesterday) {
+            yesterdayForegroundMillis += stats.totalTimeInForeground
+        }
+        val yesterdayTotalMinutes = (yesterdayForegroundMillis / 60_000L).toInt()
 
         val pm = applicationContext.packageManager
         val appEntries = mutableListOf<Map<String, Any?>>()
@@ -249,6 +260,7 @@ open class MainActivity : FlutterActivity() {
         return mapOf(
             "authorized" to true,
             "totalMinutes" to totalMinutes,
+            "yesterdayTotalMinutes" to yesterdayTotalMinutes,
             "pickupsPerHour" to pickupsPerHour,
             "apps" to sortedApps
         )
