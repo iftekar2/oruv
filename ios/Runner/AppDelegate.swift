@@ -1185,21 +1185,50 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private var isConfigured = false
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     if let controller = window?.rootViewController as? FlutterViewController {
-      let screenTimeChannel = FlutterMethodChannel(
-        name: "oruv/screen_time",
-        binaryMessenger: controller.binaryMessenger
-      )
+      configureChannels(for: controller)
+    }
+
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  // MARK: - UISceneSession Lifecycle
+
+  override func application(
+    _ application: UIApplication,
+    configurationForConnecting connectingSceneSession: UISceneSession,
+    options: UIScene.ConnectionOptions
+  ) -> UISceneConfiguration {
+    let configuration = UISceneConfiguration(
+      name: "Default Configuration",
+      sessionRole: connectingSceneSession.role
+    )
+    configuration.delegateClass = SceneDelegate.self
+    return configuration
+  }
+
+  func configureChannels(for controller: FlutterViewController) {
+    guard !isConfigured else { return }
+    isConfigured = true
+
+    GeneratedPluginRegistrant.register(with: controller)
+
+    let screenTimeChannel = FlutterMethodChannel(
+      name: "oruv/screen_time",
+      binaryMessenger: controller.binaryMessenger
+    )
 
       #if canImport(FamilyControls)
       if #available(iOS 16.0, *) {
         ScreenTimeManager.shared.methodChannel = screenTimeChannel
       }
-      if let registrar = self.registrar(forPlugin: "OruvFamilyActivityPicker") {
+      if let registrar = controller.registrar(forPlugin: "OruvFamilyActivityPicker") {
         let pickerFactory = FamilyActivityPickerFactory(messenger: registrar.messenger())
         registrar.register(pickerFactory, withId: "oruv/family_activity_picker")
 
@@ -1478,8 +1507,4 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
         ])
       }
     }
-
-    GeneratedPluginRegistrant.register(with: self)
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
-}
