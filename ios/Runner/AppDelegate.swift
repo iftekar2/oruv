@@ -266,14 +266,20 @@ struct NativeAppTokenTitleView: View {
 /// Hosts Apple's `DeviceActivityReport` view for full system-wide Screen Time reporting.
 @available(iOS 16.0, *)
 struct NativeDeviceActivityReportContainerView: View {
-  var body: some View {
-    let startOfDay = Calendar.current.startOfDay(for: Date())
-    let interval = DateInterval(start: startOfDay, end: Date())
-    let filter = DeviceActivityFilter(
+  @State private var filter: DeviceActivityFilter = {
+    let calendar = Calendar.current
+    let now = Date()
+    let startOfDay = calendar.startOfDay(for: now)
+    let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay.addingTimeInterval(86400)
+    let interval = DateInterval(start: startOfDay, end: endOfDay)
+    return DeviceActivityFilter(
       segment: .daily(during: interval),
       users: .all,
       devices: .init([.iPhone, .iPad])
     )
+  }()
+
+  var body: some View {
     DeviceActivityReport(
       DeviceActivityReport.Context("DailyScreenTime"),
       filter: filter

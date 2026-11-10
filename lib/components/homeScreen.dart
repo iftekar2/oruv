@@ -446,32 +446,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ? const Center(
                 child: CircularProgressIndicator(color: Color(0xFF1D6F58)),
               )
-            : IndexedStack(
-                index: _currentTabIndex,
-                children: [
-                  _buildHomeDashboard(snapshot),
-                  ShieldsPage(
-                    rules: _rules,
-                    onRuleToggled: _handleRuleToggled,
-                    onEditRule: _openEditRuleSheet,
-                    onAddRule: _openAddRuleSheet,
-                  ),
-                  InsightsPage(
-                    screenTimeSnapshot: _screenTimeSnapshot,
-                    timeSavedText: snapshot.projectedTimeText,
-                    onConnectScreenTime: () async {
-                      await ScreenTimeService.requestAuthorization();
-                      await _refreshDailyScreenTime();
-                    },
-                  ),
-                ],
-              ),
+            : _buildTabContent(snapshot),
       ),
       bottomNavigationBar: HomeBottomNavBar(
         currentIndex: _currentTabIndex,
         onTabSelected: _selectTab,
       ),
     );
+  }
+
+  Widget _buildTabContent(LiveAnchorSnapshot snapshot) {
+    switch (_currentTabIndex) {
+      case 1:
+        return ShieldsPage(
+          rules: _rules,
+          onRuleToggled: _handleRuleToggled,
+          onEditRule: _openEditRuleSheet,
+          onAddRule: _openAddRuleSheet,
+        );
+      case 2:
+        return InsightsPage(
+          screenTimeSnapshot: _screenTimeSnapshot,
+          timeSavedText: snapshot.projectedTimeText,
+          onConnectScreenTime: () async {
+            await ScreenTimeService.requestAuthorization();
+            await _refreshDailyScreenTime();
+          },
+        );
+      case 0:
+      default:
+        return _buildHomeDashboard(snapshot);
+    }
   }
 
   Widget _buildHomeDashboard(LiveAnchorSnapshot snapshot) {
@@ -481,54 +486,58 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Feature 1: Live Deep Work Anchor Card
-          DeepWorkAnchorCard(
-            shieldLabel: snapshot.shieldLabel,
-            title: snapshot.title,
-            isAuthorized: _screenTimeSnapshot?.isAuthorized ?? false,
-            scheduleStart: snapshot.scheduleStart,
-            scheduleEnd: snapshot.scheduleEnd,
-            remainingCycleText: snapshot.remainingCycleText,
-            progress: snapshot.progress,
-            sessionRemaining: snapshot.activeRule != null
-                ? ScheduleRuleModel.formatDurationMinutes(
-                    snapshot.activeRule!.currentCycleRemainingMinutes)
-                : '0m',
-            protectedToday: snapshot.projectedTimeText,
-            isSavingTime: snapshot.isSavingTime,
-            projectedTimeText: snapshot.projectedTimeText,
-            projectedLabel: snapshot.projectedLabel,
-            mostBlockedAppName: _mostBlockedAppName,
-            mostBlockedAppCount: _mostBlockedAppCount,
-            hasMostBlockedNativeToken: _hasMostBlockedNativeToken,
-            screenTimeToday: (_screenTimeSnapshot?.totalMinutes != null &&
-                    _screenTimeSnapshot!.totalMinutes! > 0)
-                ? ScheduleRuleModel.formatDurationMinutes(
-                    _screenTimeSnapshot!.totalMinutes!)
-                : '0m',
-            focusedDuration: snapshot.focusedDuration,
-            focusScore: snapshot.focusScore,
-            isOnBreak: _isOnMindfulBreak,
-            breakRemainingSeconds: _mindfulBreakRemainingSeconds,
-            breakTotalSeconds: _mindfulBreakTotalSeconds,
-            onTakeMindfulBreak: _handleTakeMindfulBreak,
-            onAdjust: () => _handleAdjustAnchor(snapshot),
+          RepaintBoundary(
+            child: DeepWorkAnchorCard(
+              shieldLabel: snapshot.shieldLabel,
+              title: snapshot.title,
+              isAuthorized: _screenTimeSnapshot?.isAuthorized ?? false,
+              scheduleStart: snapshot.scheduleStart,
+              scheduleEnd: snapshot.scheduleEnd,
+              remainingCycleText: snapshot.remainingCycleText,
+              progress: snapshot.progress,
+              sessionRemaining: snapshot.activeRule != null
+                  ? ScheduleRuleModel.formatDurationMinutes(
+                      snapshot.activeRule!.currentCycleRemainingMinutes)
+                  : '0m',
+              protectedToday: snapshot.projectedTimeText,
+              isSavingTime: snapshot.isSavingTime,
+              projectedTimeText: snapshot.projectedTimeText,
+              projectedLabel: snapshot.projectedLabel,
+              mostBlockedAppName: _mostBlockedAppName,
+              mostBlockedAppCount: _mostBlockedAppCount,
+              hasMostBlockedNativeToken: _hasMostBlockedNativeToken,
+              screenTimeToday: (_screenTimeSnapshot?.totalMinutes != null &&
+                      _screenTimeSnapshot!.totalMinutes! > 0)
+                  ? ScheduleRuleModel.formatDurationMinutes(
+                      _screenTimeSnapshot!.totalMinutes!)
+                  : '0m',
+              focusedDuration: snapshot.focusedDuration,
+              focusScore: snapshot.focusScore,
+              isOnBreak: _isOnMindfulBreak,
+              breakRemainingSeconds: _mindfulBreakRemainingSeconds,
+              breakTotalSeconds: _mindfulBreakTotalSeconds,
+              onTakeMindfulBreak: _handleTakeMindfulBreak,
+              onAdjust: () => _handleAdjustAnchor(snapshot),
+            ),
           ),
 
           const SizedBox(height: 20),
 
           // Feature 2: Daily Screen Time Card (Middle of screen, above Rules & Schedules)
-          DailyScreenTimeCard(
-            isAuthorized: _screenTimeSnapshot?.isAuthorized ?? false,
-            useNativeIosReport:
-                _screenTimeSnapshot?.useNativeIosReport ?? false,
-            totalMinutes: _screenTimeSnapshot?.totalMinutes,
-            apps: (_screenTimeSnapshot?.apps ?? const []).take(5).toList(),
-            onConnect: () async {
-              await ScreenTimeService.requestAuthorization();
-              await _refreshDailyScreenTime();
-            },
-            onTap: () => _selectTab(2),
-            onTapHeader: () => _selectTab(2),
+          RepaintBoundary(
+            child: DailyScreenTimeCard(
+              isAuthorized: _screenTimeSnapshot?.isAuthorized ?? false,
+              useNativeIosReport:
+                  _screenTimeSnapshot?.useNativeIosReport ?? false,
+              totalMinutes: _screenTimeSnapshot?.totalMinutes,
+              apps: (_screenTimeSnapshot?.apps ?? const []).take(5).toList(),
+              onConnect: () async {
+                await ScreenTimeService.requestAuthorization();
+                await _refreshDailyScreenTime();
+              },
+              onTap: () => _selectTab(2),
+              onTapHeader: () => _selectTab(2),
+            ),
           ),
 
           const SizedBox(height: 26),

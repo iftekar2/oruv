@@ -1,8 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class DeepWorkAnchorCard extends StatelessWidget {
@@ -237,45 +235,38 @@ class DeepWorkAnchorCard extends StatelessWidget {
                       height:
                           32, // Fixed height container to match top value line heights
                       child: Center(
-                        child: (Platform.isIOS && isAuthorized)
-                            ? const UiKitView(
-                                viewType: 'oruv/anchor_time_saved',
-                                creationParamsCodec: StandardMessageCodec(),
-                                hitTestBehavior:
-                                    PlatformViewHitTestBehavior.transparent,
-                              )
-                            : Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    isSavingTime
-                                        ? Icons.arrow_drop_down_sharp
-                                        : Icons.arrow_drop_up_sharp,
-                                    size: 25,
-                                    color: isSavingTime
-                                        ? _accentGreen
-                                        : _coralRed,
-                                  ),
-                                  Flexible(
-                                    child: Text(
-                                      projectedTimeText ??
-                                          (protectedToday ?? focusedDuration),
-                                      style: GoogleFonts.lora(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        color: isSavingTime
-                                            ? _accentGreen
-                                            : _coralRed,
-                                        letterSpacing: -0.2,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isSavingTime
+                                  ? Icons.arrow_drop_down_sharp
+                                  : Icons.arrow_drop_up_sharp,
+                              size: 25,
+                              color: isSavingTime
+                                  ? _accentGreen
+                                  : _coralRed,
+                            ),
+                            Flexible(
+                              child: Text(
+                                projectedTimeText ??
+                                    (protectedToday ?? focusedDuration),
+                                style: GoogleFonts.lora(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSavingTime
+                                      ? _accentGreen
+                                      : _coralRed,
+                                  letterSpacing: -0.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -338,20 +329,32 @@ class DeepWorkAnchorCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               )
                             : (hasMostBlockedNativeToken && Platform.isIOS
-                                  ? SizedBox(
-                                      width: double.infinity,
-                                      height: 20,
-                                      child: IgnorePointer(
-                                        child: UiKitView(
-                                          key: ValueKey<String>(
-                                            'most_blocked_title_${mostBlockedAppCount}_$hasMostBlockedNativeToken',
+                                  ? const Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: 'Apps',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: _primaryText,
+                                              height: 1.2,
+                                            ),
                                           ),
-                                          viewType:
-                                              'oruv/most_blocked_app_title',
-                                          creationParamsCodec:
-                                              const StandardMessageCodec(),
-                                        ),
+                                          TextSpan(
+                                            text: ' Blocked',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: _primaryText,
+                                              height: 1.2,
+                                            ),
+                                          ),
+                                        ],
                                       ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     )
                                   : null))
                       : null,

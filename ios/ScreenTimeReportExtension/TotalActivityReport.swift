@@ -242,6 +242,15 @@ nonisolated struct TotalActivityReport: DeviceActivityReportScene {
         let appGroupId = "group.app.iftekarhossain.oruv"
         let sharedDefaults = UserDefaults(suiteName: appGroupId)
         sharedDefaults?.set(totalMinutes, forKey: "oruv_daily_total_minutes")
+        let appsPayload: [[String: Any]] = sortedItems.map { item in
+            [
+                "id": item.id,
+                "name": item.displayName,
+                "durationMinutes": item.durationMinutes,
+                "isDistracting": true
+            ]
+        }
+        sharedDefaults?.set(appsPayload, forKey: "oruv_daily_apps")
         sharedDefaults?.synchronize()
 
         return DailyScreenTimeConfiguration(
@@ -446,6 +455,19 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
 
         sharedDefaults?.set(totalMins, forKey: "oruv_daily_total_minutes")
         sharedDefaults?.set(effectiveYesterdayMinutes, forKey: "oruv_yesterday_total_minutes")
+
+        let allTopApps = (distractingItems + otherItems)
+            .sorted { $0.durationMinutes > $1.durationMinutes }
+            .prefix(5)
+        let insightsAppsPayload: [[String: Any]] = allTopApps.map { item in
+            [
+                "id": item.id,
+                "name": item.displayName,
+                "durationMinutes": item.durationMinutes,
+                "isDistracting": item.isDistracting
+            ]
+        }
+        sharedDefaults?.set(insightsAppsPayload, forKey: "oruv_daily_apps")
         sharedDefaults?.synchronize()
 
         return InsightsScreenTimeConfiguration(

@@ -122,31 +122,26 @@ class DailyScreenTimeCard extends StatelessWidget {
   }
 
   /// iOS: Apple renders the real total, app icons, names and minutes.
+  /// Wrapped in RepaintBoundary and IgnorePointer for smooth 60/120 FPS scrolling.
   Widget _buildIosNativeReport() {
     return const Padding(
       padding: EdgeInsets.only(top: 6),
       child: SizedBox(
-        // Total headline + "Today" + divider + up to 5 tucked-in rows.
         height: 276,
-        child: Stack(
-          children: [
-            UiKitView(
+        child: IgnorePointer(
+          child: RepaintBoundary(
+            child: UiKitView(
               viewType: 'oruv/device_activity_report',
               creationParamsCodec: StandardMessageCodec(),
               hitTestBehavior: PlatformViewHitTestBehavior.transparent,
             ),
-            Positioned.fill(
-              child: ColoredBox(
-                color: Color(0x01FFFFFF),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  /// Android: real data from UsageStatsManager.
+  /// Android / Pure Flutter fallback report.
   Widget _buildFlutterReport() {
     final total =
         totalMinutes ??
@@ -180,9 +175,36 @@ class DailyScreenTimeCard extends StatelessWidget {
         if (apps.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'No app usage recorded yet today.',
-              style: GoogleFonts.lora(fontSize: 13, color: _mutedText),
+            child: Row(
+              children: [
+                Icon(
+                  total > 0
+                      ? Icons.insights_rounded
+                      : Icons.info_outline_rounded,
+                  size: 16,
+                  color: total > 0 ? _emeraldGreen : _mutedText,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    total > 0
+                        ? 'Tap to view full app breakdown in Insights'
+                        : 'No app usage recorded yet today.',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight:
+                          total > 0 ? FontWeight.w500 : FontWeight.w400,
+                      color: total > 0 ? _emeraldGreen : _mutedText,
+                    ),
+                  ),
+                ),
+                if (total > 0)
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: _emeraldGreen,
+                  ),
+              ],
             ),
           )
         else
