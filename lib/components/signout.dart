@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:oruv/components/welcomePages/welcomePage.dart';
+import 'package:oruv/components/welcomePages/screenFour.dart';
 import 'package:oruv/services/google_auth_service.dart';
+import 'package:oruv/services/preferences_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SignOut extends StatefulWidget {
@@ -22,6 +23,7 @@ class _SignOutState extends State<SignOut> {
     try {
       await GoogleAuthService.signOut();
       await Supabase.instance.client.auth.signOut();
+      await PreferencesService.setCompletedOnboarding(true);
     } catch (e) {
       debugPrint("Error signing out: $e");
     } finally {
@@ -31,7 +33,7 @@ class _SignOutState extends State<SignOut> {
         });
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const WelcomePage()),
+          MaterialPageRoute(builder: (context) => const ScreenFour()),
           (route) => false,
         );
       }

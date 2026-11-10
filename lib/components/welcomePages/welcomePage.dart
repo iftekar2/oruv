@@ -10,6 +10,7 @@ import 'package:oruv/components/welcomePages/screenFour.dart';
 import 'package:oruv/components/welcomePages/screenOne.dart';
 import 'package:oruv/components/welcomePages/screenThree.dart';
 import 'package:oruv/components/welcomePages/screenTwo.dart';
+import 'package:oruv/services/preferences_service.dart';
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
@@ -88,9 +89,11 @@ class _WelcomePageState extends State<WelcomePage>
     return page == 0 || page == 1 || page == 2 || page == 5 || page == 6;
   }
 
-  void _finishToAuth() {
+  void _finishToAuth() async {
     FocusScope.of(context).unfocus();
     _holdController.reset();
+    await PreferencesService.setCompletedOnboarding(true);
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ScreenFour()),
@@ -207,29 +210,53 @@ class _WelcomePageState extends State<WelcomePage>
                     ),
 
                     SizedBox(
-                      width: 80,
+                      width: 90,
                       height: 40,
                       child: Align(
                         alignment: Alignment.centerRight,
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 200),
-                          opacity: _currentPage >= 3 ? 1.0 : 0.0,
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: Text(
-                              _currentPage >= 3
-                                  ? "Step ${_currentPage - 2} of 5"
-                                  : "",
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: darkHeader
-                                    ? Colors.white.withValues(alpha: 0.65)
-                                    : const Color(0xFF8A8287),
+                        child: _currentPage < 3
+                            ? TextButton(
+                                onPressed: () async {
+                                  await PreferencesService.setCompletedOnboarding(true);
+                                  if (!context.mounted) return;
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const ScreenFour(),
+                                    ),
+                                  );
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  "Sign In",
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: headerElementColor,
+                                  ),
+                                ),
+                              )
+                            : AnimatedOpacity(
+                                duration: const Duration(milliseconds: 200),
+                                opacity: _currentPage >= 3 ? 1.0 : 0.0,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: Text(
+                                    "Step ${_currentPage - 2} of 5",
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: darkHeader
+                                          ? Colors.white.withValues(alpha: 0.65)
+                                          : const Color(0xFF8A8287),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                   ],

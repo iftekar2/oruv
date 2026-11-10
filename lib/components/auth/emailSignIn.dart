@@ -11,6 +11,7 @@ import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/services/apple_auth_service.dart';
 import 'package:oruv/services/google_auth_service.dart';
+import 'package:oruv/services/preferences_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EmailSignIn extends StatefulWidget {
@@ -105,6 +106,7 @@ class _EmailSignInState extends State<EmailSignIn> {
       if (OnboardingData.instance.fullName.isNotEmpty) {
         await OnboardingService.saveOnboardingData();
       }
+      await PreferencesService.setCompletedOnboarding(true);
       if (!mounted) return;
 
       Navigator.pushAndRemoveUntil(

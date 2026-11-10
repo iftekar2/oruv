@@ -6,7 +6,9 @@ import 'package:oruv/components/auth/resetPassword.dart';
 import 'package:oruv/components/homeScreen.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/components/onboarding/onboarding_service.dart';
+import 'package:oruv/components/welcomePages/screenFour.dart';
 import 'package:oruv/components/welcomePages/welcomePage.dart';
+import 'package:oruv/services/preferences_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -27,11 +29,20 @@ Future<void> main() async {
     );
   }
 
-  runApp(const MyApp());
+  bool hasCompletedOnboarding = false;
+  try {
+    hasCompletedOnboarding =
+        await PreferencesService.hasCompletedOnboarding();
+  } catch (_) {
+    hasCompletedOnboarding = false;
+  }
+
+  runApp(MyApp(hasCompletedOnboarding: hasCompletedOnboarding));
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  final bool hasCompletedOnboarding;
+  const MyApp({super.key, this.hasCompletedOnboarding = false});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -157,11 +168,20 @@ class _MyAppState extends State<MyApp> {
       isLoggedIn = false;
     }
 
+    final Widget homeScreen;
+    if (isLoggedIn) {
+      homeScreen = const HomeScreen();
+    } else if (widget.hasCompletedOnboarding) {
+      homeScreen = const ScreenFour();
+    } else {
+      homeScreen = const WelcomePage();
+    }
+
     return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'Oruv',
       debugShowCheckedModeBanner: false,
-      home: isLoggedIn ? const HomeScreen() : const WelcomePage(),
+      home: homeScreen,
     );
   }
 }

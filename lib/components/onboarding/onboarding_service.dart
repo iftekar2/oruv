@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
+import 'package:oruv/services/preferences_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OnboardingService {
@@ -9,6 +10,8 @@ class OnboardingService {
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
     if (user == null) return;
+
+    await PreferencesService.setCompletedOnboarding(true);
 
     final data = OnboardingData.instance.toMap();
 
