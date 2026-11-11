@@ -432,6 +432,7 @@ struct InsightsActivityView: View {
                 .tracking(0.2)
                 .foregroundColor(mutedText)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
     }
 

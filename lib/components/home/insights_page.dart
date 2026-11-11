@@ -58,19 +58,22 @@ class _InsightsPageState extends State<InsightsPage> {
         .toList();
   }
 
-  (String, String, bool) _computeDynamicTimeSaved(int totalMins) {
-    int baselineMinutes = 300;
+  int _onboardingBaselineMinutes() {
     final choice = OnboardingData.instance.dailyScreenTime;
     if (choice == '< 2 hours') {
-      baselineMinutes = 120;
+      return 120;
     } else if (choice == '3 - 4 hours') {
-      baselineMinutes = 240;
+      return 240;
     } else if (choice == '5 - 6 hours') {
-      baselineMinutes = 360;
+      return 360;
     } else if (choice == '7+ hours') {
-      baselineMinutes = 480;
+      return 480;
     }
+    return 300;
+  }
 
+  (String, String, bool) _computeDynamicTimeSaved(int totalMins) {
+    final baselineMinutes = _onboardingBaselineMinutes();
     final yesterdayMins =
         widget.screenTimeSnapshot?.yesterdayMinutes != null &&
             widget.screenTimeSnapshot!.yesterdayMinutes! > 0
@@ -83,6 +86,15 @@ class _InsightsPageState extends State<InsightsPage> {
     final timeText = AppScreenTimeItem.formatMinutes(absDiff);
     final label = isSavingTime ? 'On Track to Save' : 'Over Yest.';
     return (timeText, label, isSavingTime);
+  }
+
+  (String, String, bool) _computeWeeklyGoalComparison(int dailyAvgMins) {
+    final baselineMinutes = _onboardingBaselineMinutes();
+    final diff = baselineMinutes - dailyAvgMins;
+    final isUnderGoal = diff >= 0;
+    final timeText = AppScreenTimeItem.formatMinutes(diff.abs());
+    final label = isUnderGoal ? 'Under Daily Goal' : 'Over Daily Goal';
+    return (timeText, label, isUnderGoal);
   }
 
   @override
@@ -144,8 +156,9 @@ class _InsightsPageState extends State<InsightsPage> {
 
     final pickupsPerHour =
         widget.screenTimeSnapshot?.pickupsPerHour ?? (totalMins > 0 ? 1 : 0);
-    final (timeSavedText, timeSavedLabel, isSavingTime) =
-        _computeDynamicTimeSaved(totalMins);
+    final (timeSavedText, timeSavedLabel, isSavingTime) = isWeek
+        ? _computeWeeklyGoalComparison(weekDailyAvgMins)
+        : _computeDynamicTimeSaved(totalMins);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 36),
@@ -180,7 +193,7 @@ class _InsightsPageState extends State<InsightsPage> {
           _buildMetricsSummaryCard(
             distractedPercentage: '$pctDistracted%',
             timeSavedDuration: timeSavedText,
-            timeSavedLabel: isWeek ? 'Time Saved' : timeSavedLabel,
+            timeSavedLabel: timeSavedLabel,
             isSavingTime: isSavingTime,
             pickupsPerHour: '$pickupsPerHour',
           ),

@@ -660,11 +660,10 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
             weekPctDistracted = 0
         }
 
-        let baselineWeekMinutes = baselineDailyMinutes * elapsedDaysCount
-        let weekDiffMinutes = baselineWeekMinutes - weekTotalMins
+        let weekDiffMinutes = baselineDailyMinutes - weekDailyAverageMins
         let weekIsSavingTime = weekDiffMinutes >= 0
         let weekTimeSavedText = AppActivityItem.formatMinutes(abs(weekDiffMinutes))
-        let weekTimeSavedLabel = weekIsSavingTime ? "Time Saved" : "Over Goal"
+        let weekTimeSavedLabel = weekIsSavingTime ? "Under Daily Goal" : "Over Daily Goal"
 
         let priorActiveDays = (0..<todayIndex).filter { weekDays[$0].totalMinutes > 0 }.count
         let weekElapsedHours = max(1.0, Double(priorActiveDays) * 16.0 + elapsedHours)
