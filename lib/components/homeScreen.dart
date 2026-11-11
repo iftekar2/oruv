@@ -505,24 +505,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildTabContent(LiveAnchorSnapshot snapshot) {
-    switch (_currentTabIndex) {
-      case 1:
-        return ShieldsPage(
+    return IndexedStack(
+      index: _currentTabIndex,
+      children: [
+        _buildHomeDashboard(snapshot),
+        ShieldsPage(
           rules: _rules,
           onRuleToggled: _handleRuleToggled,
           onEditRule: _openEditRuleSheet,
           onAddRule: _openAddRuleSheet,
-        );
-      case 2:
-        return InsightsPage(
+        ),
+        InsightsPage(
           screenTimeSnapshot: _screenTimeSnapshot,
           timeSavedText: snapshot.projectedTimeText,
           onConnectScreenTime: _handleConnectScreenTime,
-        );
-      case 0:
-      default:
-        return _buildHomeDashboard(snapshot);
-    }
+        ),
+      ],
+    );
   }
 
   Widget _buildHomeDashboard(LiveAnchorSnapshot snapshot) {

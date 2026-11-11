@@ -281,13 +281,13 @@ struct NativeDeviceActivityReportContainerView: View {
   init() {
     let calendar = Calendar.current
     let now = Date()
-    let startOfToday = calendar.startOfDay(for: now)
-    let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday.addingTimeInterval(-86400)
-    let interval = DateInterval(start: startOfYesterday, end: now)
+    let startOfDay = calendar.startOfDay(for: now)
+    let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay.addingTimeInterval(86400)
+    let interval = DateInterval(start: startOfDay, end: endOfDay)
     self.filter = DeviceActivityFilter(
       segment: .daily(during: interval),
       users: .all,
-      devices: .init([.iPhone, .iPad])
+      devices: .init([.iPhone])
     )
   }
 
