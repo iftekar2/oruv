@@ -1,6 +1,7 @@
 class OnboardingData {
   String fullName = '';
   int? age;
+  String occupation = '';
   String focusPriority = 'Deep Work & Career Focus';
   String dailyScreenTime = '3 - 4 hours';
   bool screenTimeAuthorized = false;
@@ -32,6 +33,14 @@ class OnboardingData {
 
   Map<String, dynamic> toMap() {
     return {
+      ...toProfileMap(),
+      'occupation': occupation,
+    };
+  }
+
+  /// Exact column subset matching `public.profiles` in `supabase/schema.sql`.
+  Map<String, dynamic> toProfileMap() {
+    return {
       'full_name': fullName,
       'age': age,
       'focus_priority': focusPriority,
@@ -54,6 +63,10 @@ class OnboardingData {
     final name = map['full_name'];
     if (name is String && name.trim().isNotEmpty) {
       fullName = name.trim();
+    }
+    final rawOccupation = map['occupation'];
+    if (rawOccupation is String && rawOccupation.trim().isNotEmpty) {
+      occupation = rawOccupation.trim();
     }
     final rawAge = map['age'];
     if (rawAge is int) {
@@ -92,6 +105,7 @@ class OnboardingData {
   void reset() {
     fullName = '';
     age = null;
+    occupation = '';
     focusPriority = 'Deep Work & Career Focus';
     dailyScreenTime = '3 - 4 hours';
     screenTimeAuthorized = false;

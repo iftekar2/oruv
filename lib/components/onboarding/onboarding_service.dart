@@ -56,12 +56,40 @@ class OnboardingService {
       // 2. Also upsert into a public profiles table if the table exists
       await client.from('profiles').upsert({
         'id': user.id,
-        ...data,
+        ...OnboardingData.instance.toProfileMap(),
       });
     } catch (e) {
       // Profiles table might not be set up yet or RLS policy might differ,
       // user metadata already has the full data safely stored.
       debugPrint('Profiles table upsert note: $e');
+    }
+  }
+
+  /// Deletes user data and calls the `delete_user_account` RPC in Supabase
+  /// to remove the authenticated `auth.users` account.
+  static Future<bool> deleteAccount() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      await client.from('focus_schedules').delete().eq('user_id', user.id);
+    } catch (e) {
+      debugPrint('Delete focus_schedules note: $e');
+    }
+
+    try {
+      await client.from('profiles').delete().eq('id', user.id);
+    } catch (e) {
+      debugPrint('Delete profiles note: $e');
+    }
+
+    try {
+      await client.rpc('delete_user_account');
+      return true;
+    } catch (e) {
+      debugPrint('delete_user_account RPC note: $e');
+      return false;
     }
   }
 }

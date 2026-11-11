@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/components/onboarding/onboarding_service.dart';
+import 'package:oruv/components/settings/my_account_page.dart';
 import 'package:oruv/components/settings/settings_sheets.dart';
 import 'package:oruv/components/welcomePages/screenFour.dart';
 import 'package:oruv/services/google_auth_service.dart';
@@ -46,33 +47,6 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
       title: 'Mental Clarity & Calm',
       subtitle: 'Reduce notification noise and fragmented focus',
       icon: Icons.spa_outlined,
-    ),
-  ];
-
-  static const List<OptionPickerItem<String>> _screenTimeGoalOptions = [
-    OptionPickerItem(
-      value: '< 2 hours',
-      title: 'Under 2 hours',
-      subtitle: 'Minimalist daily digital footprint',
-      icon: Icons.bolt_rounded,
-    ),
-    OptionPickerItem(
-      value: '3 - 4 hours',
-      title: '3 - 4 hours',
-      subtitle: 'Balanced focus and intentional rest',
-      icon: Icons.balance_rounded,
-    ),
-    OptionPickerItem(
-      value: '5 - 6 hours',
-      title: '5 - 6 hours',
-      subtitle: 'Steady transition away from heavy use',
-      icon: Icons.trending_down_rounded,
-    ),
-    OptionPickerItem(
-      value: '7+ hours',
-      title: '7+ hours',
-      subtitle: 'High-baseline tracking for gradual cutbacks',
-      icon: Icons.timelapse_rounded,
     ),
   ];
 
@@ -154,43 +128,14 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     );
   }
 
-  Future<void> _openMyAccountSheet() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    final email = user?.email ?? 'Signed-in User';
-    final providerLabel = resolveAuthProviderLabel(user);
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => MyAccountSheet(
-        email: email,
-        providerLabel: providerLabel,
-        isEmailProvider: providerLabel == 'Email',
-        onSaveProfile: (fullName, age) async {
-          OnboardingData.instance.fullName = fullName;
-          OnboardingData.instance.age = age;
-          await OnboardingService.saveOnboardingData();
-          if (mounted) {
-            setState(() {});
-            _showSnackBar('Profile updated');
-          }
-        },
-        onResetPassword: () async {
-          if (user?.email == null || user!.email!.isEmpty) return;
-          try {
-            await Supabase.instance.client.auth.resetPasswordForEmail(
-              user.email!,
-              redirectTo: 'oruv://reset-password',
-            );
-            _showSnackBar('Password reset email sent to ${user.email}');
-          } catch (e) {
-            _showSnackBar('Could not send reset email', isError: true);
-          }
-        },
-        onRequestSignOut: _confirmSignOut,
-      ),
+  Future<void> _openMyAccountPage() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const MyAccountPage()),
     );
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _toggleNotifications() async {
@@ -225,7 +170,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
       title: 'Daily Screen Time Goal',
       subtitle: 'Used to track progress in your Insights tab',
       headerIcon: Icons.timelapse_rounded,
-      options: _screenTimeGoalOptions,
+      options: kScreenTimeGoalOptions,
       currentValue: OnboardingData.instance.dailyScreenTime,
     );
     if (selected == null ||
@@ -380,9 +325,9 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
           child: IconButton(
             onPressed: () => Navigator.pop(context),
             icon: const Icon(
-              Icons.arrow_back_rounded,
+              Icons.chevron_left_rounded,
               color: SettingsPalette.primaryText,
-              size: 22,
+              size: 26,
             ),
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
@@ -464,12 +409,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
               // Account Section
               const _SectionLabel(title: 'Account'),
               const SizedBox(height: 10),
-              _GroupedSettingsCard(
+              SettingsGroupedCard(
                 children: [
-                  _SettingsRow(
+                  SettingsTile(
                     icon: Icons.person_rounded,
                     title: 'My Account',
-                    onTap: _openMyAccountSheet,
+                    onTap: _openMyAccountPage,
                     showChevron: true,
                   ),
                 ],
@@ -480,9 +425,9 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
               // Personalize Section
               const _SectionLabel(title: 'Personalize'),
               const SizedBox(height: 10),
-              _GroupedSettingsCard(
+              SettingsGroupedCard(
                 children: [
-                  _SettingsRow(
+                  SettingsTile(
                     icon: Icons.notifications_rounded,
                     title: 'Focus Reminders',
                     trailingText: _notificationsEnabled ? 'On' : 'Off',
@@ -491,14 +436,14 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                         : SettingsPalette.mutedText,
                     onTap: _toggleNotifications,
                   ),
-                  _SettingsRow(
+                  SettingsTile(
                     icon: Icons.track_changes_rounded,
                     title: 'Focus Priority',
                     subtitle: OnboardingData.instance.focusPriority,
                     onTap: _pickFocusPriority,
                     showChevron: true,
                   ),
-                  _SettingsRow(
+                  SettingsTile(
                     icon: Icons.timelapse_rounded,
                     title: 'Daily Screen Time Goal',
                     subtitle: 'Baseline target used in your Insights',
@@ -506,7 +451,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                     onTap: _pickScreenTimeGoal,
                     showChevron: true,
                   ),
-                  _SettingsRow(
+                  SettingsTile(
                     icon: Icons.self_improvement_rounded,
                     title: 'Mindful Break Default',
                     subtitle: 'Default pause duration before resuming focus',
@@ -514,7 +459,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                     onTap: _pickMindfulBreakDefault,
                     showChevron: true,
                   ),
-                  _SettingsRow(
+                  SettingsTile(
                     icon: Icons.shield_rounded,
                     title: 'Strict Enforcement',
                     subtitle: 'Require mindful countdown before unblocking',
@@ -526,7 +471,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                         : SettingsPalette.mutedText,
                     onTap: _toggleStrictMode,
                   ),
-                  _SettingsRow(
+                  SettingsTile(
                     icon: Icons.phonelink_lock_rounded,
                     title: 'Screen Time Access',
                     subtitle: 'System permission for shielding & usage insights',
@@ -614,150 +559,6 @@ class _SectionLabel extends StatelessWidget {
           fontSize: 15.5,
           fontWeight: FontWeight.w700,
           color: SettingsPalette.primaryText,
-        ),
-      ),
-    );
-  }
-}
-
-class _GroupedSettingsCard extends StatelessWidget {
-  final List<Widget> children;
-
-  const _GroupedSettingsCard({required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: SettingsPalette.card,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: SettingsPalette.cardBorder, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(23),
-        child: Column(
-          children: [
-            for (int i = 0; i < children.length; i++) ...[
-              children[i],
-              if (i < children.length - 1)
-                const Padding(
-                  padding: EdgeInsets.only(left: 56, right: 16),
-                  child: Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: SettingsPalette.divider,
-                  ),
-                ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final String? trailingText;
-  final Color? trailingColor;
-  final bool showChevron;
-  final VoidCallback onTap;
-
-  const _SettingsRow({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-    this.subtitle,
-    this.trailingText,
-    this.trailingColor,
-    this.showChevron = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-          child: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: SettingsPalette.background,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: SettingsPalette.cardBorder.withValues(alpha: 0.8),
-                  ),
-                ),
-                child: Icon(
-                  icon,
-                  size: 18,
-                  color: SettingsPalette.primaryText.withValues(alpha: 0.82),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.lora(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: SettingsPalette.primaryText,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.lora(
-                          fontSize: 12.5,
-                          color: SettingsPalette.mutedText,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (trailingText != null) ...[
-                const SizedBox(width: 10),
-                Text(
-                  trailingText!,
-                  style: GoogleFonts.lora(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: trailingColor ?? SettingsPalette.mutedText,
-                  ),
-                ),
-              ],
-              if (showChevron) ...[
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 20,
-                  color: SettingsPalette.mutedText.withValues(alpha: 0.7),
-                ),
-              ],
-            ],
-          ),
         ),
       ),
     );
