@@ -38,19 +38,12 @@ class HomeBottomNavBar extends StatelessWidget {
     ];
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: const Border(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border(
           top: BorderSide(color: Color(0xFFEEEAE6), width: 1),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
       ),
       child: SafeArea(
         top: false,

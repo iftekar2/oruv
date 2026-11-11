@@ -38,20 +38,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<ScheduleRuleModel> _rules = [];
   bool _isLoadingSchedules = true;
   DailyScreenTimeSnapshot? _screenTimeSnapshot;
+  List<AppScreenTimeItem> _topFiveApps = const [];
   String _mostBlockedAppName = '';
   int _mostBlockedAppCount = 0;
   bool _hasMostBlockedNativeToken = false;
+  int _lastClockMinute = -1;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final now = DateTime.now();
+    _lastClockMinute = now.hour * 60 + now.minute;
     _initializeDataAndShields();
 
     // Refresh live progress %, remaining time, and shield enforcement every 15s
     _liveClockTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (!mounted) return;
-      setState(() {});
+      final currentNow = DateTime.now();
+      final currentMinute = currentNow.hour * 60 + currentNow.minute;
+      if (currentMinute != _lastClockMinute) {
+        _lastClockMinute = currentMinute;
+        setState(() {});
+      }
       _syncShieldAndStats();
       _refreshBlockedAttempts();
     });
@@ -75,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {
         _rules = loadedRules;
         _screenTimeSnapshot = screenTime;
+        _topFiveApps = List.unmodifiable((screenTime.apps).take(5));
         _isLoadingSchedules = false;
       });
 
@@ -95,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         _screenTimeSnapshot = screenTime;
+        _topFiveApps = List.unmodifiable((screenTime.apps).take(5));
       });
       await _syncShieldAndStats();
     } catch (e) {
@@ -106,11 +117,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     try {
       final stats = await ScreenTimeService.fetchBlockedAttempts();
       if (!mounted) return;
-      setState(() {
-        _mostBlockedAppName = (stats['appName'] as String?) ?? '';
-        _mostBlockedAppCount = (stats['count'] as int?) ?? 0;
-        _hasMostBlockedNativeToken = stats['hasNativeToken'] == true;
-      });
+      final nextName = (stats['appName'] as String?) ?? '';
+      final nextCount = (stats['count'] as int?) ?? 0;
+      final nextHasToken = stats['hasNativeToken'] == true;
+      if (nextName != _mostBlockedAppName ||
+          nextCount != _mostBlockedAppCount ||
+          nextHasToken != _hasMostBlockedNativeToken) {
+        setState(() {
+          _mostBlockedAppName = nextName;
+          _mostBlockedAppCount = nextCount;
+          _hasMostBlockedNativeToken = nextHasToken;
+        });
+      }
     } catch (e) {
       debugPrint('HomeScreen._refreshBlockedAttempts note: $e');
     }
@@ -428,6 +446,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _selectTab(1);
   }
 
+  void _handleSelectInsightsTab() {
+    _selectTab(2);
+  }
+
+  Future<void> _handleConnectScreenTime() async {
+    await ScreenTimeService.requestAuthorization();
+    await _refreshDailyScreenTime();
+  }
+
   @override
   Widget build(BuildContext context) {
     final snapshot = ScheduleService.computeLiveSnapshot(
@@ -468,10 +495,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return InsightsPage(
           screenTimeSnapshot: _screenTimeSnapshot,
           timeSavedText: snapshot.projectedTimeText,
-          onConnectScreenTime: () async {
-            await ScreenTimeService.requestAuthorization();
-            await _refreshDailyScreenTime();
-          },
+          onConnectScreenTime: _handleConnectScreenTime,
         );
       case 0:
       default:
@@ -481,6 +505,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildHomeDashboard(LiveAnchorSnapshot snapshot) {
     return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -524,31 +549,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const SizedBox(height: 20),
 
           // Feature 2: Daily Screen Time Card (Middle of screen, above Rules & Schedules)
-          RepaintBoundary(
-            child: DailyScreenTimeCard(
-              isAuthorized: _screenTimeSnapshot?.isAuthorized ?? false,
-              useNativeIosReport:
-                  _screenTimeSnapshot?.useNativeIosReport ?? false,
-              totalMinutes: _screenTimeSnapshot?.totalMinutes,
-              apps: (_screenTimeSnapshot?.apps ?? const []).take(5).toList(),
-              onConnect: () async {
-                await ScreenTimeService.requestAuthorization();
-                await _refreshDailyScreenTime();
-              },
-              onTap: () => _selectTab(2),
-              onTapHeader: () => _selectTab(2),
-            ),
+          DailyScreenTimeCard(
+            isAuthorized: _screenTimeSnapshot?.isAuthorized ?? false,
+            useNativeIosReport:
+                _screenTimeSnapshot?.useNativeIosReport ?? false,
+            totalMinutes: _screenTimeSnapshot?.totalMinutes,
+            apps: _topFiveApps,
+            onConnect: _handleConnectScreenTime,
+            onTap: _handleSelectInsightsTab,
+            onTapHeader: _handleSelectInsightsTab,
           ),
 
           const SizedBox(height: 26),
 
           // Feature 3: Rules & Schedules Section (Horizontal Row in Escalator Order)
-          RulesSchedulesSection(
-            rules: ScheduleService.sortRulesForHomeEscalator(_rules),
-            onRuleToggled: _handleRuleToggled,
-            onRuleTap: _openEditRuleSheet,
-            onViewAll: _handleViewAllRules,
-            isGrid: false,
+          RepaintBoundary(
+            child: RulesSchedulesSection(
+              rules: ScheduleService.sortRulesForHomeEscalator(_rules),
+              onRuleToggled: _handleRuleToggled,
+              onRuleTap: _openEditRuleSheet,
+              onViewAll: _handleViewAllRules,
+              isGrid: false,
+            ),
           ),
         ],
       ),

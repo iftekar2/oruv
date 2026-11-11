@@ -114,11 +114,13 @@ class RulesSchedulesSection extends StatelessWidget {
             padding: EdgeInsets.only(
               right: index == rules.length - 1 ? 0 : 14,
             ),
-            child: RuleScheduleCard(
-              rule: rule,
-              width: 234,
-              onToggle: (val) => onRuleToggled(rule.id, val),
-              onTap: () => onRuleTap(rule),
+            child: RepaintBoundary(
+              child: RuleScheduleCard(
+                rule: rule,
+                width: 234,
+                onToggle: (val) => onRuleToggled(rule.id, val),
+                onTap: () => onRuleTap(rule),
+              ),
             ),
           );
         }),

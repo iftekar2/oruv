@@ -321,6 +321,8 @@ class DailyScreenTimeCard extends StatelessWidget {
           child: Image.memory(
             item.iconBytes!,
             fit: BoxFit.cover,
+            cacheWidth: 102,
+            cacheHeight: 102,
             gaplessPlayback: true,
             errorBuilder: (_, __, ___) => _buildDefaultIcon(item.name),
           ),

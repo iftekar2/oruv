@@ -19,7 +19,9 @@ class ScreenTimeManager: ObservableObject {
   private let store = ManagedSettingsStore()
 
   var methodChannel: FlutterMethodChannel?
-  var isShieldActive: Bool = true
+  var isShieldActive: Bool = false
+  private var hasAppliedInitialShieldState: Bool = false
+  var resolvedTokenNamesCache: [String: String] = [:]
 
   @Published private(set) var orderedAppTokens: [ApplicationToken] = []
   @Published private(set) var orderedCategoryTokens: [ActivityCategoryToken] = []
@@ -32,7 +34,7 @@ class ScreenTimeManager: ObservableObject {
       saveSelection()
       notifyFlutter()
       if isShieldActive {
-        applyShield()
+        applyShield(force: true)
       }
       startDailyDeviceActivityMonitoring()
     }
@@ -74,8 +76,12 @@ class ScreenTimeManager: ObservableObject {
     }
   }
 
-  func applyShield() {
+  private var isMonitoringStarted: Bool = false
+
+  func applyShield(force: Bool = false) {
+    guard force || !isShieldActive || !hasAppliedInitialShieldState else { return }
     isShieldActive = true
+    hasAppliedInitialShieldState = true
     store.shield.applications = activitySelection.applicationTokens.isEmpty
       ? nil
       : activitySelection.applicationTokens
@@ -87,8 +93,10 @@ class ScreenTimeManager: ObservableObject {
       : activitySelection.webDomainTokens
   }
 
-  func clearShield() {
+  func clearShield(force: Bool = false) {
+    guard force || isShieldActive || !hasAppliedInitialShieldState else { return }
     isShieldActive = false
+    hasAppliedInitialShieldState = true
     store.shield.applications = nil
     store.shield.applicationCategories = nil
     store.shield.webDomains = nil
@@ -104,6 +112,7 @@ class ScreenTimeManager: ObservableObject {
 
   func startDailyDeviceActivityMonitoring() {
     #if canImport(DeviceActivity)
+    guard !isMonitoringStarted else { return }
     guard AuthorizationCenter.shared.authorizationStatus == .approved else { return }
     let center = DeviceActivityCenter()
     let activityName = DeviceActivityName("oruv.daily.activity")
@@ -114,6 +123,7 @@ class ScreenTimeManager: ObservableObject {
     )
     do {
       try center.startMonitoring(activityName, during: schedule)
+      isMonitoringStarted = true
     } catch {
       // Monitoring already active or requires physical device
     }
@@ -266,18 +276,20 @@ struct NativeAppTokenTitleView: View {
 /// Hosts Apple's `DeviceActivityReport` view for full system-wide Screen Time reporting.
 @available(iOS 16.0, *)
 struct NativeDeviceActivityReportContainerView: View {
-  @State private var filter: DeviceActivityFilter = {
+  let filter: DeviceActivityFilter
+
+  init() {
     let calendar = Calendar.current
     let now = Date()
     let startOfDay = calendar.startOfDay(for: now)
     let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay.addingTimeInterval(86400)
     let interval = DateInterval(start: startOfDay, end: endOfDay)
-    return DeviceActivityFilter(
+    self.filter = DeviceActivityFilter(
       segment: .daily(during: interval),
       users: .all,
-      devices: .init([.iPhone, .iPad])
+      devices: .init([.iPhone])
     )
-  }()
+  }
 
   var body: some View {
     DeviceActivityReport(
@@ -499,18 +511,40 @@ class AppTokenTitlePlatformView: NSObject, FlutterPlatformView {
 }
 
 class DeviceActivityContainerView: UIView {
+  weak var hostedView: UIView?
+  private var lastLaidOutSize: CGSize = .zero
+
+  override func didMoveToSuperview() {
+    super.didMoveToSuperview()
+    // Disable touch interception on FlutterTouchInterceptingView so scroll gestures
+    // starting on the Screen Time card go directly to FlutterView without delay.
+    superview?.isUserInteractionEnabled = false
+  }
+
   override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
     return nil
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    guard let hostedView = hostedView else { return }
+    let currentSize = bounds.size
+    guard currentSize.width > 1, currentSize.height > 1 else { return }
+    if currentSize != lastLaidOutSize || hostedView.frame.size != currentSize {
+      lastLaidOutSize = currentSize
+      hostedView.frame = CGRect(origin: .zero, size: currentSize)
+    }
   }
 }
 
 class DeviceActivityReportPlatformView: NSObject, FlutterPlatformView {
-  private let containerView: UIView
+  private let containerView: DeviceActivityContainerView
   private var hostingController: UIViewController?
 
   init(frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) {
     self.containerView = DeviceActivityContainerView(frame: frame)
     self.containerView.backgroundColor = .white
+    self.containerView.isOpaque = true
     self.containerView.clipsToBounds = true
     self.containerView.isUserInteractionEnabled = false
     super.init()
@@ -519,22 +553,21 @@ class DeviceActivityReportPlatformView: NSObject, FlutterPlatformView {
     if #available(iOS 16.0, *) {
       let swiftUIView = NativeDeviceActivityReportContainerView()
       let hosting = UIHostingController(rootView: swiftUIView)
-      hosting.view.isUserInteractionEnabled = false
+      hosting.sizingOptions = []
       if #available(iOS 16.4, *) {
         hosting.safeAreaRegions = []
       }
+      hosting.view.isUserInteractionEnabled = false
       hosting.view.backgroundColor = .white
+      hosting.view.isOpaque = true
       hosting.view.clipsToBounds = true
       hosting.view.insetsLayoutMarginsFromSafeArea = false
-      hosting.view.translatesAutoresizingMaskIntoConstraints = false
+      hosting.view.translatesAutoresizingMaskIntoConstraints = true
       self.containerView.addSubview(hosting.view)
-
-      NSLayoutConstraint.activate([
-        hosting.view.topAnchor.constraint(equalTo: self.containerView.topAnchor),
-        hosting.view.bottomAnchor.constraint(equalTo: self.containerView.bottomAnchor),
-        hosting.view.leadingAnchor.constraint(equalTo: self.containerView.leadingAnchor),
-        hosting.view.trailingAnchor.constraint(equalTo: self.containerView.trailingAnchor)
-      ])
+      self.containerView.hostedView = hosting.view
+      if frame.width > 1 && frame.height > 1 {
+        hosting.view.frame = CGRect(origin: .zero, size: frame.size)
+      }
       self.hostingController = hosting
     }
     #endif
@@ -1293,7 +1326,6 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
             ])
           case "getBlockedAttempts":
             let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
-            sharedDefaults?.synchronize()
 
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
@@ -1337,8 +1369,12 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
               let base64 = String(topTokenKey.dropFirst(4))
               if let data = Data(base64Encoded: base64),
                  let token = try? PropertyListDecoder().decode(ApplicationToken.self, from: data) {
-                ScreenTimeManager.shared.mostBlockedAppToken = token
-                ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+                if ScreenTimeManager.shared.mostBlockedAppToken != token {
+                  ScreenTimeManager.shared.mostBlockedAppToken = token
+                }
+                if ScreenTimeManager.shared.mostBlockedCategoryToken != nil {
+                  ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+                }
                 if appName.isEmpty, let resolved = Application(token: token).localizedDisplayName, !resolved.isEmpty {
                   appName = resolved
                 }
@@ -1347,15 +1383,23 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
               let base64 = String(topTokenKey.dropFirst(4))
               if let data = Data(base64Encoded: base64),
                  let token = try? PropertyListDecoder().decode(ActivityCategoryToken.self, from: data) {
-                ScreenTimeManager.shared.mostBlockedCategoryToken = token
-                ScreenTimeManager.shared.mostBlockedAppToken = nil
+                if ScreenTimeManager.shared.mostBlockedCategoryToken != token {
+                  ScreenTimeManager.shared.mostBlockedCategoryToken = token
+                }
+                if ScreenTimeManager.shared.mostBlockedAppToken != nil {
+                  ScreenTimeManager.shared.mostBlockedAppToken = nil
+                }
                 if appName.isEmpty, let resolved = ActivityCategory(token: token).localizedDisplayName, !resolved.isEmpty {
                   appName = resolved
                 }
               }
             } else if topTokenKey.hasPrefix("web:") {
-              ScreenTimeManager.shared.mostBlockedAppToken = nil
-              ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+              if ScreenTimeManager.shared.mostBlockedAppToken != nil {
+                ScreenTimeManager.shared.mostBlockedAppToken = nil
+              }
+              if ScreenTimeManager.shared.mostBlockedCategoryToken != nil {
+                ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+              }
               let base64 = String(topTokenKey.dropFirst(4))
               if let data = Data(base64Encoded: base64),
                  let token = try? PropertyListDecoder().decode(WebDomainToken.self, from: data),
@@ -1364,11 +1408,19 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
                 appName = domain
               }
             } else if count == 0 {
-              ScreenTimeManager.shared.mostBlockedAppToken = nil
-              ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+              if ScreenTimeManager.shared.mostBlockedAppToken != nil {
+                ScreenTimeManager.shared.mostBlockedAppToken = nil
+              }
+              if ScreenTimeManager.shared.mostBlockedCategoryToken != nil {
+                ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+              }
             }
 
-            // 4. Resolve app name from shared app_names.json, token dictionary, or last shielded app name
+            // 4. Resolve app name from in-memory cache, shared app_names.json, token dictionary, or last shielded app name
+            if appName.isEmpty, !topTokenKey.isEmpty,
+               let cached = ScreenTimeManager.shared.resolvedTokenNamesCache[topTokenKey], !cached.isEmpty {
+              appName = cached
+            }
             if appName.isEmpty {
               if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
                 let namesURL = containerURL.appendingPathComponent("app_names.json")
@@ -1385,9 +1437,14 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
                 ?? ""
             }
 
-            // 5. If still empty, inspect the native token view directly
-            if appName.isEmpty, let token = ScreenTimeManager.shared.mostBlockedAppToken {
-              if let resolved = extractAppName(from: token), !resolved.isEmpty {
+            // 5. If still empty and not yet attempted for this token key, inspect the native token view once
+            if appName.isEmpty,
+               !topTokenKey.isEmpty,
+               ScreenTimeManager.shared.resolvedTokenNamesCache[topTokenKey] == nil,
+               let token = ScreenTimeManager.shared.mostBlockedAppToken {
+              let resolved = extractAppName(from: token) ?? ""
+              ScreenTimeManager.shared.resolvedTokenNamesCache[topTokenKey] = resolved
+              if !resolved.isEmpty {
                 appName = resolved
                 sharedDefaults?.set(resolved, forKey: "oruv_most_blocked_app_name")
                 if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
@@ -1401,6 +1458,8 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
                   }
                 }
               }
+            } else if !appName.isEmpty, !topTokenKey.isEmpty {
+              ScreenTimeManager.shared.resolvedTokenNamesCache[topTokenKey] = appName
             }
 
             let hasNativeToken = (ScreenTimeManager.shared.mostBlockedAppToken != nil
@@ -1461,45 +1520,58 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
           case "syncShield":
             let args = call.arguments as? [String: Any]
             let shouldBlock = (args?["shouldBlock"] as? Bool) ?? true
-            let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
-            if let sessionRemaining = args?["sessionRemaining"] as? String {
-              sharedDefaults?.set(sessionRemaining, forKey: "oruv_session_remaining")
-            }
-            if let protectedToday = args?["protectedToday"] as? String {
-              sharedDefaults?.set(protectedToday, forKey: "oruv_protected_today")
-            }
-            if let screenTimeToday = args?["screenTimeToday"] as? String {
-              sharedDefaults?.set(screenTimeToday, forKey: "oruv_screen_time_today")
-            }
-            if let scheduleTitle = args?["scheduleTitle"] as? String {
-              sharedDefaults?.set(scheduleTitle, forKey: "oruv_schedule_title")
-            }
-            if let projectedTimeText = args?["projectedTimeText"] as? String {
-              sharedDefaults?.set(projectedTimeText, forKey: "oruv_projected_time")
-            }
-            if let projectedLabel = args?["projectedLabel"] as? String {
-              sharedDefaults?.set(projectedLabel, forKey: "oruv_projected_label")
-            }
-            if let isSavingTime = args?["isSavingTime"] as? Bool {
-              sharedDefaults?.set(isSavingTime, forKey: "oruv_is_saving_time")
-            }
-            if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
-              let metricsURL = containerURL.appendingPathComponent("insights_metrics.json")
-              var metricsDict: [String: Any] = [:]
-              if let baselineMinutes = args?["baselineMinutes"] as? Int {
-                metricsDict["baselineMinutes"] = baselineMinutes
-              }
-              if let elapsedSavedMinutes = args?["elapsedSavedMinutes"] as? Int {
-                metricsDict["elapsedSavedMinutes"] = elapsedSavedMinutes
-              }
-              if let projectedTimeText = args?["projectedTimeText"] as? String {
-                metricsDict["projectedTimeText"] = projectedTimeText
-              }
-              if !metricsDict.isEmpty, let data = try? JSONSerialization.data(withJSONObject: metricsDict, options: []) {
-                try? data.write(to: metricsURL, options: .atomic)
-              }
-            }
             ScreenTimeManager.shared.syncShield(shouldBlock: shouldBlock)
+
+            let sessionRemaining = args?["sessionRemaining"] as? String
+            let protectedToday = args?["protectedToday"] as? String
+            let screenTimeToday = args?["screenTimeToday"] as? String
+            let scheduleTitle = args?["scheduleTitle"] as? String
+            let projectedTimeText = args?["projectedTimeText"] as? String
+            let projectedLabel = args?["projectedLabel"] as? String
+            let isSavingTime = args?["isSavingTime"] as? Bool
+            let baselineMinutes = args?["baselineMinutes"] as? Int
+            let elapsedSavedMinutes = args?["elapsedSavedMinutes"] as? Int
+
+            DispatchQueue.global(qos: .utility).async {
+              let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
+              if let sessionRemaining = sessionRemaining {
+                sharedDefaults?.set(sessionRemaining, forKey: "oruv_session_remaining")
+              }
+              if let protectedToday = protectedToday {
+                sharedDefaults?.set(protectedToday, forKey: "oruv_protected_today")
+              }
+              if let screenTimeToday = screenTimeToday {
+                sharedDefaults?.set(screenTimeToday, forKey: "oruv_screen_time_today")
+              }
+              if let scheduleTitle = scheduleTitle {
+                sharedDefaults?.set(scheduleTitle, forKey: "oruv_schedule_title")
+              }
+              if let projectedTimeText = projectedTimeText {
+                sharedDefaults?.set(projectedTimeText, forKey: "oruv_projected_time")
+              }
+              if let projectedLabel = projectedLabel {
+                sharedDefaults?.set(projectedLabel, forKey: "oruv_projected_label")
+              }
+              if let isSavingTime = isSavingTime {
+                sharedDefaults?.set(isSavingTime, forKey: "oruv_is_saving_time")
+              }
+              if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
+                let metricsURL = containerURL.appendingPathComponent("insights_metrics.json")
+                var metricsDict: [String: Any] = [:]
+                if let baselineMinutes = baselineMinutes {
+                  metricsDict["baselineMinutes"] = baselineMinutes
+                }
+                if let elapsedSavedMinutes = elapsedSavedMinutes {
+                  metricsDict["elapsedSavedMinutes"] = elapsedSavedMinutes
+                }
+                if let projectedTimeText = projectedTimeText {
+                  metricsDict["projectedTimeText"] = projectedTimeText
+                }
+                if !metricsDict.isEmpty, let data = try? JSONSerialization.data(withJSONObject: metricsDict, options: []) {
+                  try? data.write(to: metricsURL, options: .atomic)
+                }
+              }
+            }
             result(true)
           default:
             result(FlutterMethodNotImplemented)

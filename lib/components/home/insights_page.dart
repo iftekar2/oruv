@@ -547,6 +547,8 @@ class _InsightsPageState extends State<InsightsPage> {
           child: Image.memory(
             item.iconBytes!,
             fit: BoxFit.cover,
+            cacheWidth: 114,
+            cacheHeight: 114,
             gaplessPlayback: true,
             errorBuilder: (_, __, ___) => _buildMonogramIcon(item.name),
           ),
