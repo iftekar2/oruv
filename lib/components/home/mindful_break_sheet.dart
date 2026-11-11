@@ -4,10 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 class MindfulBreakSheet extends StatefulWidget {
   final ValueChanged<int> onStartBreakMinutes;
 
-  const MindfulBreakSheet({
-    super.key,
-    required this.onStartBreakMinutes,
-  });
+  const MindfulBreakSheet({super.key, required this.onStartBreakMinutes});
 
   @override
   State<MindfulBreakSheet> createState() => _MindfulBreakSheetState();
@@ -87,26 +84,13 @@ class _MindfulBreakSheetState extends State<MindfulBreakSheet> {
               ],
             ),
             const SizedBox(height: 22),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Select Duration',
-                  style: GoogleFonts.lora(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: _primaryText,
-                  ),
-                ),
-                Text(
-                  '-$_selectedMinutes Focus Score',
-                  style: GoogleFonts.lora(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFFD97706),
-                  ),
-                ),
-              ],
+            Text(
+              'Select Duration',
+              style: GoogleFonts.lora(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: _primaryText,
+              ),
             ),
             const SizedBox(height: 12),
             Row(
@@ -167,7 +151,7 @@ class _MindfulBreakSheetState extends State<MindfulBreakSheet> {
                   ),
                 ),
                 child: Text(
-                  'Begin $_selectedMinutes-Minute Break',
+                  'Begin $_selectedMinutes Minute Break',
                   style: GoogleFonts.lora(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -181,4 +165,3 @@ class _MindfulBreakSheetState extends State<MindfulBreakSheet> {
     );
   }
 }
-
