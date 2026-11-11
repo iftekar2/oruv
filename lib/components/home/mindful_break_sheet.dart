@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:oruv/services/preferences_service.dart';
 
 class MindfulBreakSheet extends StatefulWidget {
   final ValueChanged<int> onStartBreakMinutes;
@@ -13,6 +14,19 @@ class MindfulBreakSheet extends StatefulWidget {
 class _MindfulBreakSheetState extends State<MindfulBreakSheet> {
   int _selectedMinutes = 5;
   final List<int> _options = [5, 10, 15];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDefaultDuration();
+  }
+
+  Future<void> _loadDefaultDuration() async {
+    final defaultMins = await PreferencesService.getMindfulBreakDefaultMinutes();
+    if (mounted) {
+      setState(() => _selectedMinutes = defaultMins);
+    }
+  }
 
   static const Color _accentGreen = Color(0xFF1D6F58);
   static const Color _primaryText = Color(0xFF1B1B1D);

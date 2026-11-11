@@ -13,6 +13,8 @@ import 'package:oruv/components/home/rule_editor_sheet.dart';
 import 'package:oruv/components/home/rules_schedules_section.dart';
 import 'package:oruv/components/home/shields_page.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
+import 'package:oruv/components/onboarding/onboarding_service.dart';
+import 'package:oruv/components/settings/profile_settings_page.dart';
 import 'package:oruv/services/schedule_service.dart';
 import 'package:oruv/services/screen_time_service.dart';
 
@@ -69,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _initializeDataAndShields() async {
     try {
+      await OnboardingService.loadOnboardingData();
       await ScheduleService.refreshNativeSelectionCounts(
         onCountUpdated: (_) {
           if (mounted) {
@@ -488,7 +491,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: const HomeTopAppBar(),
+      appBar: HomeTopAppBar(
+        onProfileTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ProfileSettingsPage(),
+            ),
+          );
+          if (mounted) {
+            setState(() {});
+            _refreshDailyScreenTime();
+          }
+        },
+      ),
       body: SafeArea(
         bottom: false,
         child: _isLoadingSchedules

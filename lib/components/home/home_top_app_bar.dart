@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:oruv/components/signout.dart';
+import 'package:oruv/components/settings/profile_settings_page.dart';
 
 class HomeTopAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onProfileTap;
@@ -42,7 +42,9 @@ class HomeTopAppBar extends StatelessWidget implements PreferredSizeWidget {
                 () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const SignOut()),
+                    MaterialPageRoute(
+                      builder: (context) => const ProfileSettingsPage(),
+                    ),
                   );
                 },
             icon: const Icon(

@@ -50,6 +50,45 @@ class OnboardingData {
     };
   }
 
+  void loadFromMap(Map<String, dynamic> map) {
+    final name = map['full_name'];
+    if (name is String && name.trim().isNotEmpty) {
+      fullName = name.trim();
+    }
+    final rawAge = map['age'];
+    if (rawAge is int) {
+      age = rawAge;
+    } else if (rawAge is num) {
+      age = rawAge.toInt();
+    }
+    final priority = map['focus_priority'];
+    if (priority is String && priority.isNotEmpty) {
+      focusPriority = priority;
+    }
+    final screenTime = map['daily_screen_time'];
+    if (screenTime is String && screenTime.isNotEmpty) {
+      dailyScreenTime = screenTime;
+    }
+    if (map['screen_time_authorized'] is bool) {
+      screenTimeAuthorized = map['screen_time_authorized'] as bool;
+    }
+    if (map['strict_lock'] is bool) {
+      strictLock = map['strict_lock'] as bool;
+    }
+    final start = map['schedule_start'];
+    if (start is String && start.isNotEmpty) {
+      scheduleStart = start;
+    }
+    final end = map['schedule_end'];
+    if (end is String && end.isNotEmpty) {
+      scheduleEnd = end;
+    }
+    final days = map['active_days'];
+    if (days is List && days.isNotEmpty) {
+      activeDays = days.map((e) => e.toString()).toSet();
+    }
+  }
+
   void reset() {
     fullName = '';
     age = null;
