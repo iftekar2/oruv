@@ -25,7 +25,7 @@ class InsightsPage extends StatefulWidget {
 }
 
 class _InsightsPageState extends State<InsightsPage> {
-  String _selectedGranularity = 'D'; // 'D', 'W', 'M'
+  String _selectedGranularity = 'D'; // 'D', 'W'
 
   static const Color _primaryText = Color(0xFF1B1B1D);
   static const Color _mutedText = Color(0xFF6E6A6E);
@@ -101,6 +101,7 @@ class _InsightsPageState extends State<InsightsPage> {
       );
     }
 
+    final isWeek = _selectedGranularity == 'W';
     final effectiveApps = widget.screenTimeSnapshot?.apps ?? const [];
 
     final distractingApps = _getDistractingApps(effectiveApps);
@@ -116,6 +117,20 @@ class _InsightsPageState extends State<InsightsPage> {
     );
     final rawTotal = widget.screenTimeSnapshot?.totalMinutes ?? 0;
     final totalMins = math.max(rawTotal, distractingMins + otherMins);
+
+    // Sunday-start week index: 0 = Sun, 1 = Mon, ..., 6 = Sat
+    final todayIndex = DateTime.now().weekday % 7;
+    final elapsedDays = todayIndex + 1;
+    final yesterdayMins = widget.screenTimeSnapshot?.yesterdayMinutes ?? 0;
+
+    final weekDayMinutes = List<int>.generate(7, (idx) {
+      if (idx > todayIndex) return 0; // Future days have no data
+      if (idx == todayIndex) return totalMins;
+      if (idx == todayIndex - 1 && yesterdayMins > 0) return yesterdayMins;
+      return 0;
+    });
+    final weekTotalMins = weekDayMinutes.fold<int>(0, (sum, m) => sum + m);
+    final weekDailyAvgMins = (weekTotalMins / elapsedDays).round();
 
     final pctDistracted = totalMins > 0
         ? ((distractingMins / totalMins) * 100).round().clamp(0, 100)
@@ -142,23 +157,37 @@ class _InsightsPageState extends State<InsightsPage> {
             const SizedBox(height: 22),
           ],
 
-          // ─── 1. TOP HERO: Screen Time + Granularity Switcher ────────
-          _buildHeroHeader(totalMins),
+          // ─── 1. TOP HERO: Screen Time / Daily Average + Switcher ─────
+          _buildHeroHeader(
+            isWeek ? weekDailyAvgMins : totalMins,
+            isWeek: isWeek,
+          ),
 
           const SizedBox(height: 22),
 
-          // ─── 2. 3-COLUMN METRICS SUMMARY CARD ────────────────────────
+          // ─── 2. WEEKLY BAR GRAPH (Week mode only) ────────────────────
+          if (isWeek) ...[
+            _buildWeeklyBarChartCard(
+              weekDayMinutes: weekDayMinutes,
+              todayIndex: todayIndex,
+              dailyAvgMinutes: weekDailyAvgMins,
+              weekTotalMinutes: weekTotalMins,
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ─── 3. 3-COLUMN METRICS SUMMARY CARD ────────────────────────
           _buildMetricsSummaryCard(
             distractedPercentage: '$pctDistracted%',
             timeSavedDuration: timeSavedText,
-            timeSavedLabel: timeSavedLabel,
+            timeSavedLabel: isWeek ? 'Time Saved' : timeSavedLabel,
             isSavingTime: isSavingTime,
             pickupsPerHour: '$pickupsPerHour',
           ),
 
           const SizedBox(height: 26),
 
-          // ─── 3. DISTRACTING APPS SECTION ─────────────────────────────
+          // ─── 4. DISTRACTING APPS SECTION ─────────────────────────────
           _buildSectionHeader(
             title: 'Distracting Apps',
             durationText: AppScreenTimeItem.formatMinutes(distractingMins),
@@ -168,12 +197,14 @@ class _InsightsPageState extends State<InsightsPage> {
             apps: distractingApps,
             maxAppMinutes: maxAppMins,
             defaultBarColor: _redBarColor,
-            emptyMessage: 'No distracting app activity recorded today.',
+            emptyMessage: isWeek
+                ? 'No distracting app activity recorded this week.'
+                : 'No distracting app activity recorded today.',
           ),
 
           const SizedBox(height: 50),
 
-          // ─── 4. OTHER APPS SECTION ───────────────────────────────────
+          // ─── 5. OTHER APPS SECTION ───────────────────────────────────
           _buildSectionHeader(
             title: 'Other Apps',
             durationText: AppScreenTimeItem.formatMinutes(otherMins),
@@ -183,7 +214,9 @@ class _InsightsPageState extends State<InsightsPage> {
             apps: otherApps,
             maxAppMinutes: maxAppMins,
             defaultBarColor: _emeraldGreen,
-            emptyMessage: 'No other app activity recorded today.',
+            emptyMessage: isWeek
+                ? 'No other app activity recorded this week.'
+                : 'No other app activity recorded today.',
             isOtherSection: true,
           ),
         ],
@@ -193,7 +226,7 @@ class _InsightsPageState extends State<InsightsPage> {
 
   // ─── HERO HEADER ─────────────────────────────────────────────────────────
 
-  Widget _buildHeroHeader(int totalMinutes) {
+  Widget _buildHeroHeader(int displayMinutes, {required bool isWeek}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,7 +235,7 @@ class _InsightsPageState extends State<InsightsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Screen Time',
+              isWeek ? 'Daily Average' : 'Screen Time',
               style: GoogleFonts.lora(
                 fontSize: 14,
                 color: _mutedText,
@@ -211,7 +244,7 @@ class _InsightsPageState extends State<InsightsPage> {
             ),
             const SizedBox(height: 2),
             Text(
-              AppScreenTimeItem.formatMinutes(totalMinutes),
+              AppScreenTimeItem.formatMinutes(displayMinutes),
               style: GoogleFonts.lora(
                 fontSize: 44,
                 fontWeight: FontWeight.w800,
@@ -223,7 +256,7 @@ class _InsightsPageState extends State<InsightsPage> {
           ],
         ),
 
-        // Granularity Switcher: ( D )  W   M
+        // Granularity Switcher: ( D )  W
         Padding(
           padding: const EdgeInsets.only(top: 4),
           child: _buildGranularityPill(),
@@ -242,7 +275,7 @@ class _InsightsPageState extends State<InsightsPage> {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: ['D', 'W', 'M'].map((granularity) {
+        children: ['D', 'W'].map((granularity) {
           final isSelected = _selectedGranularity == granularity;
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -274,6 +307,227 @@ class _InsightsPageState extends State<InsightsPage> {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  // ─── WEEKLY BAR CHART CARD ───────────────────────────────────────────────
+
+  Widget _buildWeeklyBarChartCard({
+    required List<int> weekDayMinutes,
+    required int todayIndex,
+    required int dailyAvgMinutes,
+    required int weekTotalMinutes,
+  }) {
+    const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    final maxDay = weekDayMinutes.fold<int>(0, (a, b) => math.max(a, b));
+    final peak = math.max(maxDay, dailyAvgMinutes);
+    final rawHours = math.max(2, (peak / 60.0).ceil());
+    final ceilingHours = rawHours.isEven ? rawHours : rawHours + 1;
+    final chartMaxMinutes = math.max(120, ceilingHours * 60);
+    const chartHeight = 132.0;
+    const axisWidth = 34.0;
+    const cardFill = Color(0xFFFDFBF9);
+    const avgLineColor = Color(0xFF22A06B);
+
+    final avgRatio = (dailyAvgMinutes / chartMaxMinutes).clamp(0.0, 1.0);
+    final avgY = chartHeight * (1.0 - avgRatio);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+      decoration: BoxDecoration(
+        color: cardFill,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFF0EAE6), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: chartHeight,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final plotWidth = math.max(1.0, constraints.maxWidth - axisWidth);
+                final colWidth = plotWidth / 7.0;
+
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      width: plotWidth,
+                      height: chartHeight,
+                      child: CustomPaint(
+                        painter: _WeeklyChartGridPainter(
+                          gridColor: const Color(0xFFECE5E1),
+                          avgY: avgY,
+                          showAvgLine: dailyAvgMinutes > 0,
+                          avgLineColor: avgLineColor,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      width: plotWidth,
+                      height: chartHeight,
+                      child: Row(
+                        children: List.generate(7, (idx) {
+                          final isFuture = idx > todayIndex;
+                          final mins = weekDayMinutes[idx];
+                          final ratio = (mins / chartMaxMinutes).clamp(0.0, 1.0);
+                          final barH = (!isFuture && mins > 0)
+                              ? math.max(5.0, chartHeight * ratio)
+                              : 0.0;
+
+                          return SizedBox(
+                            width: colWidth,
+                            height: chartHeight,
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: barH > 0
+                                  ? Container(
+                                      width: math.min(
+                                        20.0,
+                                        math.max(12.0, colWidth * 0.48),
+                                      ),
+                                      height: barH,
+                                      decoration: const BoxDecoration(
+                                        color: _emeraldGreen,
+                                        borderRadius: BorderRadius.vertical(
+                                          top: Radius.circular(5),
+                                        ),
+                                      ),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      width: axisWidth,
+                      height: chartHeight,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned(
+                            top: 0,
+                            child: Text(
+                              '${ceilingHours}h',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: _mutedText,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: chartHeight * 0.5 - 6,
+                            child: Text(
+                              '${ceilingHours ~/ 2}h',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: _mutedText,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            child: Text(
+                              '0',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: _mutedText,
+                              ),
+                            ),
+                          ),
+                          if (dailyAvgMinutes > 0)
+                            Positioned(
+                              top: (avgY - 7).clamp(4.0, chartHeight - 16.0),
+                              child: Container(
+                                color: cardFill,
+                                padding: const EdgeInsets.symmetric(horizontal: 2),
+                                child: Text(
+                                  'avg',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: avgLineColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: List.generate(7, (idx) {
+                    final isToday = idx == todayIndex;
+                    final isFuture = idx > todayIndex;
+                    return Expanded(
+                      child: Center(
+                        child: Text(
+                          dayLabels[idx],
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight:
+                                isToday ? FontWeight.w700 : FontWeight.w500,
+                            color: isToday
+                                ? _primaryText
+                                : (isFuture
+                                      ? _mutedText.withValues(alpha: 0.5)
+                                      : _mutedText),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+              const SizedBox(width: axisWidth),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(color: Color(0xFFEFE8E5), height: 1, thickness: 1),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total Screen Time',
+                style: GoogleFonts.lora(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                  color: _mutedText,
+                ),
+              ),
+              Text(
+                AppScreenTimeItem.formatMinutes(weekTotalMinutes),
+                style: GoogleFonts.lora(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: _primaryText,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -629,5 +883,65 @@ class _InsightsPageState extends State<InsightsPage> {
         ],
       ),
     );
+  }
+}
+
+class _WeeklyChartGridPainter extends CustomPainter {
+  final Color gridColor;
+  final double avgY;
+  final bool showAvgLine;
+  final Color avgLineColor;
+
+  _WeeklyChartGridPainter({
+    required this.gridColor,
+    required this.avgY,
+    required this.showAvgLine,
+    required this.avgLineColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 0.8;
+
+    for (final factor in [0.0, 0.5, 1.0]) {
+      final y = size.height * factor;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final dividerPaint = Paint()
+      ..color = gridColor.withValues(alpha: 0.65)
+      ..strokeWidth = 0.7;
+    final colWidth = size.width / 7.0;
+    for (int i = 0; i <= 7; i++) {
+      final x = colWidth * i;
+      double y = 0;
+      while (y < size.height) {
+        final endY = math.min(y + 2, size.height);
+        canvas.drawLine(Offset(x, y), Offset(x, endY), dividerPaint);
+        y += 4;
+      }
+    }
+
+    if (showAvgLine) {
+      final avgPaint = Paint()
+        ..color = avgLineColor
+        ..strokeWidth = 1.5;
+      double x = 0;
+      while (x < size.width) {
+        final endX = math.min(x + 3, size.width);
+        canvas.drawLine(Offset(x, avgY), Offset(endX, avgY), avgPaint);
+        x += 6;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WeeklyChartGridPainter oldDelegate) {
+    return oldDelegate.avgY != avgY ||
+        oldDelegate.showAvgLine != showAvgLine ||
+        oldDelegate.gridColor != gridColor ||
+        oldDelegate.avgLineColor != avgLineColor;
   }
 }

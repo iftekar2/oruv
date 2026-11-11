@@ -65,6 +65,14 @@ struct InsightsAppActivityItem: Identifiable, Sendable {
     }
 }
 
+struct WeekdayScreenTimeItem: Identifiable, Sendable {
+    let id: Int // 0 = Sunday ... 6 = Saturday
+    let dayLabel: String
+    let totalMinutes: Int
+    let isToday: Bool
+    let isFuture: Bool
+}
+
 struct InsightsScreenTimeConfiguration: Sendable {
     let totalMinutes: Int
     let distractingMinutes: Int
@@ -77,6 +85,19 @@ struct InsightsScreenTimeConfiguration: Sendable {
     let distractingApps: [InsightsAppActivityItem]
     let otherApps: [InsightsAppActivityItem]
 
+    let weekTotalMinutes: Int
+    let weekDailyAverageMinutes: Int
+    let weekDistractingMinutes: Int
+    let weekOtherMinutes: Int
+    let weekDistractedPercentage: Int
+    let weekTimeSavedText: String
+    let weekTimeSavedLabel: String
+    let weekIsSavingTime: Bool
+    let weekPickupsPerHour: Int
+    let weekDays: [WeekdayScreenTimeItem]
+    let weekDistractingApps: [InsightsAppActivityItem]
+    let weekOtherApps: [InsightsAppActivityItem]
+
     var formattedTotalDuration: String {
         AppActivityItem.formatMinutes(totalMinutes)
     }
@@ -87,6 +108,22 @@ struct InsightsScreenTimeConfiguration: Sendable {
 
     var formattedOtherDuration: String {
         AppActivityItem.formatMinutes(otherMinutes)
+    }
+
+    var formattedWeekDailyAverage: String {
+        AppActivityItem.formatMinutes(weekDailyAverageMinutes)
+    }
+
+    var formattedWeekTotalDuration: String {
+        AppActivityItem.formatMinutes(weekTotalMinutes)
+    }
+
+    var formattedWeekDistractingDuration: String {
+        AppActivityItem.formatMinutes(weekDistractingMinutes)
+    }
+
+    var formattedWeekOtherDuration: String {
+        AppActivityItem.formatMinutes(weekOtherMinutes)
     }
 }
 
@@ -346,11 +383,19 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
         let now = Date()
         let calendar = Calendar.current
         let startOfToday = calendar.startOfDay(for: now)
+        let weekday = calendar.component(.weekday, from: now) // 1 = Sun ... 7 = Sat
+        let todayIndex = max(0, min(6, weekday - 1))
+        let startOfWeekSunday = calendar.date(byAdding: .day, value: -todayIndex, to: startOfToday) ?? startOfToday
+        let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday.addingTimeInterval(-86400)
 
         var todayTotalSeconds: TimeInterval = 0
         var yesterdayTotalSeconds: TimeInterval = 0
         var todayPickups: Int = 0
         var earliestPickup: Date? = nil
+
+        var weekDaySeconds: [TimeInterval] = Array(repeating: 0, count: 7)
+        var weekDayAppSeconds: [TimeInterval] = Array(repeating: 0, count: 7)
+        var weekPickups: Int = 0
 
         struct RawAppAccumulator {
             var name: String
@@ -361,11 +406,56 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
             var pickups: Int
         }
 
-        var appMap: [ApplicationToken: RawAppAccumulator] = [:]
+        var todayAppMap: [ApplicationToken: RawAppAccumulator] = [:]
+        var weekAppMap: [ApplicationToken: RawAppAccumulator] = [:]
+
+        func accumulateApp(
+            into map: inout [ApplicationToken: RawAppAccumulator],
+            token: ApplicationToken,
+            name: String,
+            bundleId: String,
+            catName: String,
+            catToken: ActivityCategoryToken?,
+            duration: TimeInterval,
+            pickups: Int
+        ) {
+            if var existing = map[token] {
+                if (existing.name == "App" || existing.name.isEmpty) && !name.isEmpty {
+                    existing.name = name
+                }
+                if existing.bundleId.isEmpty && !bundleId.isEmpty {
+                    existing.bundleId = bundleId
+                }
+                if existing.categoryName.isEmpty && !catName.isEmpty {
+                    existing.categoryName = catName
+                }
+                if existing.categoryToken == nil && catToken != nil {
+                    existing.categoryToken = catToken
+                }
+                existing.seconds += duration
+                existing.pickups += pickups
+                map[token] = existing
+            } else {
+                map[token] = RawAppAccumulator(
+                    name: name,
+                    bundleId: bundleId,
+                    categoryName: catName,
+                    categoryToken: catToken,
+                    seconds: duration,
+                    pickups: pickups
+                )
+            }
+        }
 
         for await activityData in data {
             for await segment in activityData.activitySegments {
-                let isToday = segment.dateInterval.end > startOfToday
+                let segDuration = max(0, segment.dateInterval.duration)
+                let segMidpoint = segment.dateInterval.start.addingTimeInterval(segDuration * 0.5)
+                let segDayStart = calendar.startOfDay(for: segMidpoint)
+                let isToday = segDayStart >= startOfToday || segment.dateInterval.end > startOfToday
+                let isYesterday = !isToday && segDayStart == startOfYesterday
+                let isInCurrentWeek = segDayStart >= startOfWeekSunday && segDayStart <= startOfToday
+                let segDayIdx = max(0, min(6, calendar.component(.weekday, from: segDayStart) - 1))
 
                 if isToday {
                     todayTotalSeconds += segment.totalActivityDuration
@@ -375,8 +465,13 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
                             earliestPickup = fp
                         }
                     }
-                } else {
+                } else if isYesterday {
                     yesterdayTotalSeconds += segment.totalActivityDuration
+                }
+
+                if isInCurrentWeek && segDayIdx <= todayIndex {
+                    weekDaySeconds[segDayIdx] += segment.totalActivityDuration
+                    weekPickups += segment.totalPickupsWithoutApplicationActivity
                 }
 
                 for await categoryActivity in segment.categories {
@@ -389,81 +484,93 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
 
                         if isToday {
                             todayPickups += pickups
+                        }
+                        if isInCurrentWeek && segDayIdx <= todayIndex {
+                            weekPickups += pickups
+                            weekDayAppSeconds[segDayIdx] += duration
+                        }
 
-                            guard duration >= 60, let token = appActivity.application.token else { continue }
-                            let name = appActivity.application.localizedDisplayName ?? "App"
-                            let bundleId = appActivity.application.bundleIdentifier ?? ""
+                        guard duration > 0, let token = appActivity.application.token else { continue }
+                        let name = appActivity.application.localizedDisplayName ?? "App"
+                        let bundleId = appActivity.application.bundleIdentifier ?? ""
 
-                            if var existing = appMap[token] {
-                                if (existing.name == "App" || existing.name.isEmpty) && !name.isEmpty {
-                                    existing.name = name
-                                }
-                                if existing.bundleId.isEmpty && !bundleId.isEmpty {
-                                    existing.bundleId = bundleId
-                                }
-                                if existing.categoryName.isEmpty && !catName.isEmpty {
-                                    existing.categoryName = catName
-                                }
-                                if existing.categoryToken == nil && catToken != nil {
-                                    existing.categoryToken = catToken
-                                }
-                                existing.seconds += duration
-                                existing.pickups += pickups
-                                appMap[token] = existing
-                            } else {
-                                appMap[token] = RawAppAccumulator(
-                                    name: name,
-                                    bundleId: bundleId,
-                                    categoryName: catName,
-                                    categoryToken: catToken,
-                                    seconds: duration,
-                                    pickups: pickups
-                                )
-                            }
+                        if isToday && duration >= 60 {
+                            accumulateApp(
+                                into: &todayAppMap,
+                                token: token,
+                                name: name,
+                                bundleId: bundleId,
+                                catName: catName,
+                                catToken: catToken,
+                                duration: duration,
+                                pickups: pickups
+                            )
+                        }
+
+                        if isInCurrentWeek && segDayIdx <= todayIndex {
+                            accumulateApp(
+                                into: &weekAppMap,
+                                token: token,
+                                name: name,
+                                bundleId: bundleId,
+                                catName: catName,
+                                catToken: catToken,
+                                duration: duration,
+                                pickups: pickups
+                            )
                         }
                     }
                 }
             }
         }
 
-        var distractingItems: [InsightsAppActivityItem] = []
-        var otherItems: [InsightsAppActivityItem] = []
+        func categorizeApps(
+            from map: [ApplicationToken: RawAppAccumulator]
+        ) -> (distracting: [InsightsAppActivityItem], other: [InsightsAppActivityItem]) {
+            var distracting: [InsightsAppActivityItem] = []
+            var other: [InsightsAppActivityItem] = []
 
-        for (token, info) in appMap {
-            let mins = max(1, Int(info.seconds / 60))
-            let isOruv = AppCategorizer.isOruvApp(name: info.name, bundleId: info.bundleId)
-            let isBrowser = AppCategorizer.isBrowserApp(name: info.name, bundleId: info.bundleId)
-            let isDistracting = AppCategorizer.isDistracting(
-                token: token,
-                name: info.name,
-                bundleId: info.bundleId,
-                categoryName: info.categoryName,
-                categoryToken: info.categoryToken,
-                selectedAppTokens: selectedAppTokens,
-                selectedCategoryTokens: selectedCategoryTokens
-            )
+            for (token, info) in map {
+                guard info.seconds >= 60 else { continue }
+                let mins = max(1, Int(info.seconds / 60))
+                let isOruv = AppCategorizer.isOruvApp(name: info.name, bundleId: info.bundleId)
+                let isBrowser = AppCategorizer.isBrowserApp(name: info.name, bundleId: info.bundleId)
+                let isDistracting = AppCategorizer.isDistracting(
+                    token: token,
+                    name: info.name,
+                    bundleId: info.bundleId,
+                    categoryName: info.categoryName,
+                    categoryToken: info.categoryToken,
+                    selectedAppTokens: selectedAppTokens,
+                    selectedCategoryTokens: selectedCategoryTokens
+                )
 
-            let item = InsightsAppActivityItem(
-                id: "\(token.hashValue)",
-                token: token,
-                displayName: info.name,
-                bundleId: info.bundleId,
-                categoryName: info.categoryName,
-                durationMinutes: mins,
-                isDistracting: isDistracting,
-                isOruv: isOruv,
-                isBrowser: isBrowser
-            )
+                let item = InsightsAppActivityItem(
+                    id: "\(token.hashValue)",
+                    token: token,
+                    displayName: info.name,
+                    bundleId: info.bundleId,
+                    categoryName: info.categoryName,
+                    durationMinutes: mins,
+                    isDistracting: isDistracting,
+                    isOruv: isOruv,
+                    isBrowser: isBrowser
+                )
 
-            if isDistracting {
-                distractingItems.append(item)
-            } else {
-                otherItems.append(item)
+                if isDistracting {
+                    distracting.append(item)
+                } else {
+                    other.append(item)
+                }
             }
+
+            distracting.sort { $0.durationMinutes > $1.durationMinutes }
+            other.sort { $0.durationMinutes > $1.durationMinutes }
+            return (distracting, other)
         }
 
-        distractingItems.sort { $0.durationMinutes > $1.durationMinutes }
-        otherItems.sort { $0.durationMinutes > $1.durationMinutes }
+        let (distractingItems, otherItems) = categorizeApps(from: todayAppMap)
+        let (weekDistractingItems, weekOtherItems) = categorizeApps(from: weekAppMap)
 
         let distractingMins = distractingItems.reduce(0) { $0 + $1.durationMinutes }
         let otherMins = otherItems.reduce(0) { $0 + $1.durationMinutes }
@@ -471,7 +578,7 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
         let totalMins = max(rawTodayMins, distractingMins + otherMins)
         let yesterdayMins = max(0, Int(yesterdayTotalSeconds / 60))
 
-        // 1. % DISTRACTED
+        // 1. % DISTRACTED (Day)
         let pctDistracted: Int
         if totalMins > 0 {
             pctDistracted = min(100, max(0, Int(round(Double(distractingMins) / Double(totalMins) * 100.0))))
@@ -479,7 +586,7 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
             pctDistracted = 0
         }
 
-        // 2. PICKUPS / HR
+        // 2. PICKUPS / HR (Day)
         let sevenAM = startOfToday.addingTimeInterval(7 * 3600)
         let referenceStart: Date
         if let fp = earliestPickup {
@@ -494,12 +601,12 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
         if todayPickups > 0 {
             pickupsPerHour = max(1, Int(round(Double(todayPickups) / elapsedHours)))
         } else if totalMins > 0 {
-            pickupsPerHour = max(1, Int(round(Double(appMap.count) / elapsedHours)))
+            pickupsPerHour = max(1, Int(round(Double(todayAppMap.count) / elapsedHours)))
         } else {
             pickupsPerHour = 0
         }
 
-        // 3. TIME SAVED vs YESTERDAY (Yesterday's screen time minus today's screen time)
+        // 3. TIME SAVED vs YESTERDAY (Day)
         var baselineDailyMinutes = 300 // 5h default daily distraction/screen baseline fallback
         if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
             let fileURL = containerURL.appendingPathComponent("insights_metrics.json")
@@ -517,6 +624,58 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
         let absDiffMinutes = abs(diffMinutes)
         let timeSavedText = AppActivityItem.formatMinutes(absDiffMinutes)
         let timeSavedLabel = isSavingTime ? "On Track to Save" : "Over Yest."
+
+        // 4. WEEK AGGREGATES (Sunday through Today only)
+        let dayLabels = ["S", "M", "T", "W", "T", "F", "S"]
+        var weekDays: [WeekdayScreenTimeItem] = []
+        weekDays.reserveCapacity(7)
+        for idx in 0..<7 {
+            let isFuture = idx > todayIndex
+            let isTodayIdx = idx == todayIndex
+            let rawDayMins = max(0, Int(round(max(weekDaySeconds[idx], weekDayAppSeconds[idx]) / 60.0)))
+            let dayMins = isFuture ? 0 : (isTodayIdx ? max(rawDayMins, totalMins) : rawDayMins)
+            weekDays.append(
+                WeekdayScreenTimeItem(
+                    id: idx,
+                    dayLabel: dayLabels[idx],
+                    totalMinutes: dayMins,
+                    isToday: isTodayIdx,
+                    isFuture: isFuture
+                )
+            )
+        }
+
+        let weekDistractingMins = weekDistractingItems.reduce(0) { $0 + $1.durationMinutes }
+        let weekOtherMins = weekOtherItems.reduce(0) { $0 + $1.durationMinutes }
+        let sumOfWeekDays = weekDays.reduce(0) { $0 + $1.totalMinutes }
+        let weekTotalMins = max(sumOfWeekDays, weekDistractingMins + weekOtherMins)
+
+        let elapsedDaysCount = max(1, todayIndex + 1)
+        let weekDailyAverageMins = Int(round(Double(weekTotalMins) / Double(elapsedDaysCount)))
+
+        let weekPctDistracted: Int
+        if weekTotalMins > 0 {
+            weekPctDistracted = min(100, max(0, Int(round(Double(weekDistractingMins) / Double(weekTotalMins) * 100.0))))
+        } else {
+            weekPctDistracted = 0
+        }
+
+        let baselineWeekMinutes = baselineDailyMinutes * elapsedDaysCount
+        let weekDiffMinutes = baselineWeekMinutes - weekTotalMins
+        let weekIsSavingTime = weekDiffMinutes >= 0
+        let weekTimeSavedText = AppActivityItem.formatMinutes(abs(weekDiffMinutes))
+        let weekTimeSavedLabel = weekIsSavingTime ? "Time Saved" : "Over Goal"
+
+        let priorActiveDays = (0..<todayIndex).filter { weekDays[$0].totalMinutes > 0 }.count
+        let weekElapsedHours = max(1.0, Double(priorActiveDays) * 16.0 + elapsedHours)
+        let weekPickupsPerHour: Int
+        if weekPickups > 0 {
+            weekPickupsPerHour = max(1, Int(round(Double(weekPickups) / weekElapsedHours)))
+        } else if weekTotalMins > 0 {
+            weekPickupsPerHour = max(1, Int(round(Double(weekAppMap.count) / weekElapsedHours)))
+        } else {
+            weekPickupsPerHour = 0
+        }
 
         sharedDefaults?.set(totalMins, forKey: "oruv_daily_total_minutes")
         sharedDefaults?.set(effectiveYesterdayMinutes, forKey: "oruv_yesterday_total_minutes")
@@ -577,7 +736,19 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
             isSavingTime: isSavingTime,
             pickupsPerHour: pickupsPerHour,
             distractingApps: distractingItems,
-            otherApps: otherItems
+            otherApps: otherItems,
+            weekTotalMinutes: weekTotalMins,
+            weekDailyAverageMinutes: weekDailyAverageMins,
+            weekDistractingMinutes: weekDistractingMins,
+            weekOtherMinutes: weekOtherMins,
+            weekDistractedPercentage: weekPctDistracted,
+            weekTimeSavedText: weekTimeSavedText,
+            weekTimeSavedLabel: weekTimeSavedLabel,
+            weekIsSavingTime: weekIsSavingTime,
+            weekPickupsPerHour: weekPickupsPerHour,
+            weekDays: weekDays,
+            weekDistractingApps: weekDistractingItems,
+            weekOtherApps: weekOtherItems
         )
     }
 }

@@ -310,8 +310,12 @@ struct NativeInsightsReportContainerView: View {
     let calendar = Calendar.current
     let now = Date()
     let startOfToday = calendar.startOfDay(for: now)
+    let weekday = calendar.component(.weekday, from: now) // 1 = Sunday ... 7 = Saturday
+    let daysSinceSunday = max(0, weekday - 1)
+    let startOfWeekSunday = calendar.date(byAdding: .day, value: -daysSinceSunday, to: startOfToday) ?? startOfToday
     let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday.addingTimeInterval(-86400)
-    let interval = DateInterval(start: startOfYesterday, end: now)
+    let reportStart = min(startOfWeekSunday, startOfYesterday)
+    let interval = DateInterval(start: reportStart, end: now)
     let filter = DeviceActivityFilter(
       segment: .daily(during: interval),
       users: .all,

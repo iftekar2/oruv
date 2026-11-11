@@ -97,49 +97,63 @@ struct InsightsActivityView: View {
     private let dividerColor = Color(red: 0.957, green: 0.937, blue: 0.918) // #F4EFEA
 
     var body: some View {
+        let isWeek = selectedGranularity == "W"
+        let activeDistractingApps = isWeek ? configuration.weekDistractingApps : configuration.distractingApps
+        let activeOtherApps = isWeek ? configuration.weekOtherApps : configuration.otherApps
+
         let allMax = max(
-            configuration.distractingApps.map(\.durationMinutes).max() ?? 1,
-            configuration.otherApps.map(\.durationMinutes).max() ?? 1
+            activeDistractingApps.map(\.durationMinutes).max() ?? 1,
+            activeOtherApps.map(\.durationMinutes).max() ?? 1
         )
         let maxAppMins = max(1, allMax)
 
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                // ─── 1. TOP HERO: Screen Time + Granularity Switcher ────────
-                heroHeader
+                // ─── 1. TOP HERO: Screen Time / Daily Average + Granularity Switcher
+                heroHeader(isWeek: isWeek)
                     .padding(.bottom, 22)
 
-                // ─── 2. 3-COLUMN METRICS SUMMARY CARD ────────────────────────
-                metricsSummaryCard
+                // ─── 2. WEEKLY BAR GRAPH (Week mode only) ────────────────────
+                if isWeek {
+                    weeklyBarChartCard
+                        .padding(.bottom, 16)
+                }
+
+                // ─── 3. 3-COLUMN METRICS SUMMARY CARD ────────────────────────
+                metricsSummaryCard(isWeek: isWeek)
                     .padding(.bottom, 26)
 
-                // ─── 3. DISTRACTING APPS SECTION ─────────────────────────────
+                // ─── 4. DISTRACTING APPS SECTION ─────────────────────────────
                 sectionHeader(
                     title: "Distracting Apps",
-                    durationText: configuration.formattedDistractingDuration
+                    durationText: isWeek ? configuration.formattedWeekDistractingDuration : configuration.formattedDistractingDuration
                 )
                 .padding(.bottom, 10)
 
                 appSectionList(
-                    apps: configuration.distractingApps,
+                    apps: activeDistractingApps,
                     maxAppMinutes: maxAppMins,
                     isOtherSection: false,
-                    emptyMessage: "No distracting app activity recorded today."
+                    emptyMessage: isWeek
+                        ? "No distracting app activity recorded this week."
+                        : "No distracting app activity recorded today."
                 )
                 .padding(.bottom, 36)
 
-                // ─── 4. OTHER APPS SECTION ───────────────────────────────────
+                // ─── 5. OTHER APPS SECTION ───────────────────────────────────
                 sectionHeader(
                     title: "Other Apps",
-                    durationText: configuration.formattedOtherDuration
+                    durationText: isWeek ? configuration.formattedWeekOtherDuration : configuration.formattedOtherDuration
                 )
                 .padding(.bottom, 10)
 
                 appSectionList(
-                    apps: configuration.otherApps,
+                    apps: activeOtherApps,
                     maxAppMinutes: maxAppMins,
                     isOtherSection: true,
-                    emptyMessage: "No other app activity recorded today."
+                    emptyMessage: isWeek
+                        ? "No other app activity recorded this week."
+                        : "No other app activity recorded today."
                 )
             }
             .padding(.horizontal, 18)
@@ -152,14 +166,14 @@ struct InsightsActivityView: View {
 
     // ─── HERO HEADER ─────────────────────────────────────────────────────────
 
-    private var heroHeader: some View {
+    private func heroHeader(isWeek: Bool) -> some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Screen Time")
+                Text(isWeek ? "Daily Average" : "Screen Time")
                     .font(.system(size: 14, weight: .medium, design: .serif))
                     .foregroundColor(mutedText)
 
-                Text(configuration.formattedTotalDuration)
+                Text(isWeek ? configuration.formattedWeekDailyAverage : configuration.formattedTotalDuration)
                     .font(.system(size: 44, weight: .heavy, design: .serif))
                     .foregroundColor(primaryText)
             }
@@ -173,7 +187,7 @@ struct InsightsActivityView: View {
 
     private var granularityPill: some View {
         HStack(spacing: 0) {
-            ForEach(["D", "W", "M"], id: \.self) { granularity in
+            ForEach(["D", "W"], id: \.self) { granularity in
                 let isSelected = selectedGranularity == granularity
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) {
@@ -204,12 +218,169 @@ struct InsightsActivityView: View {
         )
     }
 
+    // ─── WEEKLY BAR CHART CARD ───────────────────────────────────────────────
+
+    private var weeklyBarChartCard: some View {
+        let maxDayMinutes = configuration.weekDays.map(\.totalMinutes).max() ?? 0
+        let peakMinutes = max(maxDayMinutes, configuration.weekDailyAverageMinutes)
+        let rawHours = max(2, Int(ceil(Double(peakMinutes) / 60.0)))
+        let ceilingHours = rawHours % 2 == 0 ? rawHours : rawHours + 1
+        let chartMaxMinutes = max(120, ceilingHours * 60)
+        let avgMinutes = configuration.weekDailyAverageMinutes
+        let cardFill = Color(red: 0.992, green: 0.984, blue: 0.976)
+        let gridColor = Color(red: 0.925, green: 0.902, blue: 0.886)
+        let avgLineColor = Color(red: 0.133, green: 0.627, blue: 0.416)
+        let chartHeight: CGFloat = 132
+        let axisWidth: CGFloat = 34
+
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(spacing: 6) {
+                GeometryReader { geo in
+                    let plotWidth = max(1, geo.size.width - axisWidth)
+                    let colWidth = plotWidth / 7.0
+                    let avgRatio = min(1.0, max(0.0, Double(avgMinutes) / Double(chartMaxMinutes)))
+                    let avgY = chartHeight * (1.0 - avgRatio)
+
+                    ZStack(alignment: .topLeading) {
+                        // Horizontal grid lines (top, mid, 0)
+                        ForEach([0.0, 0.5, 1.0], id: \.self) { factor in
+                            Path { path in
+                                let y = chartHeight * factor
+                                path.move(to: CGPoint(x: 0, y: y))
+                                path.addLine(to: CGPoint(x: plotWidth, y: y))
+                            }
+                            .stroke(gridColor, lineWidth: 0.8)
+                        }
+
+                        // Vertical day dividers
+                        ForEach(0..<8, id: \.self) { idx in
+                            Path { path in
+                                let x = colWidth * CGFloat(idx)
+                                path.move(to: CGPoint(x: x, y: 0))
+                                path.addLine(to: CGPoint(x: x, y: chartHeight))
+                            }
+                            .stroke(gridColor.opacity(0.65), style: StrokeStyle(lineWidth: 0.7, dash: [2, 2]))
+                        }
+
+                        // 7 weekday bars (only rendered up through today)
+                        HStack(spacing: 0) {
+                            ForEach(configuration.weekDays) { day in
+                                let ratio = min(1.0, max(0.0, Double(day.totalMinutes) / Double(chartMaxMinutes)))
+                                let barHeight = (!day.isFuture && day.totalMinutes > 0)
+                                    ? max(5, chartHeight * ratio)
+                                    : 0
+
+                                ZStack(alignment: .bottom) {
+                                    Color.clear
+                                    if barHeight > 0 {
+                                        TopRoundedBarShape(radius: 5)
+                                            .fill(emeraldGreen)
+                                            .frame(width: min(20, max(12, colWidth * 0.48)), height: barHeight)
+                                    }
+                                }
+                                .frame(width: colWidth, height: chartHeight)
+                            }
+                        }
+
+                        // Dashed green daily average line
+                        if avgMinutes > 0 {
+                            Path { path in
+                                path.move(to: CGPoint(x: 0, y: avgY))
+                                path.addLine(to: CGPoint(x: plotWidth, y: avgY))
+                            }
+                            .stroke(avgLineColor, style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
+                        }
+
+                        // Right Y-axis labels
+                        ZStack(alignment: .topLeading) {
+                            Text("\(ceilingHours)h")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(mutedText)
+                                .position(x: axisWidth / 2, y: 6)
+
+                            Text("\(ceilingHours / 2)h")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(mutedText)
+                                .position(x: axisWidth / 2, y: chartHeight * 0.5)
+
+                            Text("0")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(mutedText)
+                                .position(x: axisWidth / 2, y: chartHeight - 5)
+
+                            if avgMinutes > 0 {
+                                Text("avg")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(avgLineColor)
+                                    .padding(.horizontal, 3)
+                                    .background(cardFill)
+                                    .position(x: axisWidth / 2, y: min(chartHeight - 10, max(10, avgY)))
+                            }
+                        }
+                        .frame(width: axisWidth, height: chartHeight)
+                        .offset(x: plotWidth)
+                    }
+                }
+                .frame(height: chartHeight)
+
+                // Day labels row (S M T W T F S) aligned with bar columns
+                HStack(spacing: 0) {
+                    HStack(spacing: 0) {
+                        ForEach(configuration.weekDays) { day in
+                            Text(day.dayLabel)
+                                .font(.system(size: 11, weight: day.isToday ? .bold : .medium))
+                                .foregroundColor(
+                                    day.isToday
+                                        ? primaryText
+                                        : (day.isFuture ? mutedText.opacity(0.5) : mutedText)
+                                )
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    Spacer()
+                        .frame(width: axisWidth)
+                }
+            }
+
+            Divider()
+                .background(Color(red: 0.937, green: 0.910, blue: 0.898))
+
+            HStack {
+                Text("Total Screen Time")
+                    .font(.system(size: 13.5, weight: .medium, design: .serif))
+                    .foregroundColor(mutedText)
+
+                Spacer()
+
+                Text(configuration.formattedWeekTotalDuration)
+                    .font(.system(size: 15, weight: .bold, design: .serif))
+                    .foregroundColor(primaryText)
+            }
+        }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(cardFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color(red: 0.941, green: 0.918, blue: 0.902), lineWidth: 1.2)
+        )
+    }
+
     // ─── 3-COLUMN METRICS SUMMARY CARD ───────────────────────────────────────
 
-    private var metricsSummaryCard: some View {
-        HStack(spacing: 0) {
+    private func metricsSummaryCard(isWeek: Bool) -> some View {
+        let distractedPct = isWeek ? configuration.weekDistractedPercentage : configuration.distractedPercentage
+        let savedText = isWeek ? configuration.weekTimeSavedText : configuration.timeSavedText
+        let savedLabel = isWeek ? configuration.weekTimeSavedLabel : configuration.timeSavedLabel
+        let isSaving = isWeek ? configuration.weekIsSavingTime : configuration.isSavingTime
+        let pickups = isWeek ? configuration.weekPickupsPerHour : configuration.pickupsPerHour
+
+        return HStack(spacing: 0) {
             metricColumn(
-                value: "\(configuration.distractedPercentage)%",
+                value: "\(distractedPct)%",
                 label: "Distracted",
                 valueColor: primaryText
             )
@@ -220,9 +391,9 @@ struct InsightsActivityView: View {
                 .frame(width: 1, height: 28)
 
             metricColumn(
-                value: configuration.timeSavedText,
-                label: configuration.timeSavedLabel,
-                valueColor: configuration.isSavingTime ? emeraldGreen : redBarColor
+                value: savedText,
+                label: savedLabel,
+                valueColor: isSaving ? emeraldGreen : redBarColor
             )
             .frame(maxWidth: .infinity)
 
@@ -231,7 +402,7 @@ struct InsightsActivityView: View {
                 .frame(width: 1, height: 28)
 
             metricColumn(
-                value: "\(configuration.pickupsPerHour)",
+                value: "\(pickups)",
                 label: "Pickups/HR",
                 valueColor: primaryText
             )
@@ -419,5 +590,28 @@ struct AnchorTimeSavedView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
+    }
+}
+
+private struct TopRoundedBarShape: Shape {
+    var radius: CGFloat = 5
+
+    func path(in rect: CGRect) -> Path {
+        let r = min(radius, min(rect.width / 2, rect.height))
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + r, y: rect.minY),
+            control: CGPoint(x: rect.minX, y: rect.minY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.minY + r),
+            control: CGPoint(x: rect.maxX, y: rect.minY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
