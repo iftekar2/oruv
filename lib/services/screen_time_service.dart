@@ -23,6 +23,15 @@ class DailyScreenTimeSnapshot {
   /// `DeviceActivityReport` extension, so the card must embed that native view.
   final bool useNativeIosReport;
 
+  /// Time saved or over yesterday formatted text (e.g., "32m", "1h 15m")
+  final String? timeSavedText;
+
+  /// Label matching the status ("On Track to Save" or "Over Yest.")
+  final String? timeSavedLabel;
+
+  /// Whether the user is saving time compared to yesterday
+  final bool? isSavingTime;
+
   const DailyScreenTimeSnapshot({
     required this.isAuthorized,
     this.totalMinutes,
@@ -30,6 +39,9 @@ class DailyScreenTimeSnapshot {
     this.pickupsPerHour,
     this.apps = const [],
     this.useNativeIosReport = false,
+    this.timeSavedText,
+    this.timeSavedLabel,
+    this.isSavingTime,
   });
 
   static const unavailable = DailyScreenTimeSnapshot(isAuthorized: false);
@@ -98,6 +110,17 @@ class ScreenTimeService {
         final rawTotal = (res?['totalMinutes'] as num?)?.toInt() ?? 0;
         final rawYesterday = (res?['yesterdayTotalMinutes'] as num?)?.toInt();
         final rawPickups = (res?['pickupsPerHour'] as num?)?.toInt();
+        final rawTimeSavedText = res?['timeSavedText'] as String?;
+        final timeSavedText =
+            (rawTimeSavedText != null && rawTimeSavedText.isNotEmpty)
+                ? rawTimeSavedText
+                : null;
+        final rawTimeSavedLabel = res?['timeSavedLabel'] as String?;
+        final timeSavedLabel =
+            (rawTimeSavedLabel != null && rawTimeSavedLabel.isNotEmpty)
+                ? rawTimeSavedLabel
+                : null;
+        final isSavingTime = res?['isSavingTime'] as bool?;
         final rawApps = res?['apps'];
         final parsedApps = <AppScreenTimeItem>[];
 
@@ -131,6 +154,9 @@ class ScreenTimeService {
           pickupsPerHour: rawPickups,
           apps: parsedApps,
           useNativeIosReport: true,
+          timeSavedText: timeSavedText,
+          timeSavedLabel: timeSavedLabel,
+          isSavingTime: isSavingTime,
         );
       }
 
@@ -149,6 +175,15 @@ class ScreenTimeService {
       final rawPickups = (res['pickupsPerHour'] as num?)?.toInt() ?? 0;
       final rawApps = res['apps'];
       final parsedApps = <AppScreenTimeItem>[];
+
+      final yesterdayBaseline = (rawYesterday != null && rawYesterday > 0)
+          ? rawYesterday
+          : 300;
+      final diff = yesterdayBaseline - rawTotal;
+      final androidIsSavingTime = diff >= 0;
+      final androidTimeSavedText = AppScreenTimeItem.formatMinutes(diff.abs());
+      final androidTimeSavedLabel =
+          androidIsSavingTime ? 'On Track to Save' : 'Over Yest.';
 
       if (rawApps is List) {
         for (int i = 0; i < rawApps.length; i++) {
@@ -189,6 +224,9 @@ class ScreenTimeService {
         yesterdayMinutes: rawYesterday,
         pickupsPerHour: rawPickups,
         apps: parsedApps,
+        timeSavedText: androidTimeSavedText,
+        timeSavedLabel: androidTimeSavedLabel,
+        isSavingTime: androidIsSavingTime,
       );
     } catch (e) {
       debugPrint('ScreenTimeService.fetchDailyScreenTime note: $e');

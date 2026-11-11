@@ -396,16 +396,25 @@ struct AnchorTimeSavedView: View {
 
     private let accentGreen = Color(red: 0.114, green: 0.435, blue: 0.345) // #1D6F58
     private let coralRed = Color(red: 0.851, green: 0.282, blue: 0.255)    // #D94841
+    private let mutedText = Color(red: 0.431, green: 0.416, blue: 0.431)   // #6E6A6E
 
     var body: some View {
-        HStack(spacing: 2) {
-            Image(systemName: configuration.isSavingTime ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(configuration.isSavingTime ? accentGreen : coralRed)
+        VStack(spacing: 6) {
+            HStack(spacing: 2) {
+                Image(systemName: configuration.isSavingTime ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(configuration.isSavingTime ? accentGreen : coralRed)
 
-            Text(configuration.timeText)
-                .font(.system(size: 20, weight: .bold, design: .serif))
-                .foregroundColor(configuration.isSavingTime ? accentGreen : coralRed)
+                Text(configuration.timeText)
+                    .font(.system(size: 20, weight: .bold, design: .serif))
+                    .foregroundColor(configuration.isSavingTime ? accentGreen : coralRed)
+                    .lineLimit(1)
+            }
+            .frame(height: 32)
+
+            Text(configuration.label)
+                .font(.system(size: 11, weight: .semibold, design: .serif))
+                .foregroundColor(mutedText)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

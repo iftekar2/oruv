@@ -281,13 +281,13 @@ struct NativeDeviceActivityReportContainerView: View {
   init() {
     let calendar = Calendar.current
     let now = Date()
-    let startOfDay = calendar.startOfDay(for: now)
-    let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay.addingTimeInterval(86400)
-    let interval = DateInterval(start: startOfDay, end: endOfDay)
+    let startOfToday = calendar.startOfDay(for: now)
+    let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday.addingTimeInterval(-86400)
+    let interval = DateInterval(start: startOfYesterday, end: now)
     self.filter = DeviceActivityFilter(
       segment: .daily(during: interval),
       users: .all,
-      devices: .init([.iPhone])
+      devices: .init([.iPhone, .iPad])
     )
   }
 
@@ -330,17 +330,20 @@ struct NativeInsightsReportContainerView: View {
 /// Hosts Apple's `DeviceActivityReport` view for the Deep Work Anchor card's "On Track to Save" column.
 @available(iOS 16.0, *)
 struct NativeAnchorTimeSavedContainerView: View {
-  var body: some View {
+  @State private var filter: DeviceActivityFilter = {
     let calendar = Calendar.current
     let now = Date()
     let startOfToday = calendar.startOfDay(for: now)
     let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday.addingTimeInterval(-86400)
     let interval = DateInterval(start: startOfYesterday, end: now)
-    let filter = DeviceActivityFilter(
+    return DeviceActivityFilter(
       segment: .daily(during: interval),
       users: .all,
       devices: .init([.iPhone, .iPad])
     )
+  }()
+
+  var body: some View {
     DeviceActivityReport(
       DeviceActivityReport.Context("AnchorTimeSaved"),
       filter: filter
@@ -1498,9 +1501,93 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
             let categoriesCount = ScreenTimeManager.shared.orderedCategoryTokens.count
             let domainsCount = ScreenTimeManager.shared.activitySelection.webDomainTokens.count
             let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
-            let cachedTotalMinutes = sharedDefaults?.integer(forKey: "oruv_daily_total_minutes") ?? 0
-            let cachedYesterdayMinutes = sharedDefaults?.integer(forKey: "oruv_yesterday_total_minutes") ?? 0
-            let cachedApps = (sharedDefaults?.array(forKey: "oruv_daily_apps") as? [[String: Any]]) ?? []
+            sharedDefaults?.synchronize()
+            var cachedTotalMinutes = sharedDefaults?.integer(forKey: "oruv_daily_total_minutes") ?? 0
+            var cachedYesterdayMinutes = sharedDefaults?.integer(forKey: "oruv_yesterday_total_minutes") ?? 0
+            var cachedTimeSavedText = sharedDefaults?.string(forKey: "oruv_time_saved_text") ?? ""
+            var cachedTimeSavedLabel = sharedDefaults?.string(forKey: "oruv_time_saved_label") ?? ""
+            var cachedIsSavingTime: Bool? = nil
+            if let ist = sharedDefaults?.object(forKey: "oruv_is_saving_time") as? Bool {
+              cachedIsSavingTime = ist
+            } else if let num = sharedDefaults?.object(forKey: "oruv_is_saving_time") as? NSNumber {
+              cachedIsSavingTime = num.boolValue
+            }
+            var cachedApps = (sharedDefaults?.array(forKey: "oruv_daily_apps") as? [[String: Any]]) ?? []
+
+            if let insightsText = sharedDefaults?.string(forKey: "oruv_insights_time_saved_text"), !insightsText.isEmpty {
+              cachedTimeSavedText = insightsText
+            }
+            if let insightsLabel = sharedDefaults?.string(forKey: "oruv_insights_time_saved_label"), !insightsLabel.isEmpty {
+              cachedTimeSavedLabel = insightsLabel
+            }
+            if let insightsIsSaving = sharedDefaults?.object(forKey: "oruv_insights_is_saving_time") as? Bool {
+              cachedIsSavingTime = insightsIsSaving
+            }
+            if let insightsYesterday = sharedDefaults?.object(forKey: "oruv_insights_yesterday_minutes") as? Int, insightsYesterday > 0 {
+              cachedYesterdayMinutes = insightsYesterday
+            }
+            if let insightsToday = sharedDefaults?.object(forKey: "oruv_insights_today_minutes") as? Int, insightsToday > 0 {
+              cachedTotalMinutes = insightsToday
+            }
+
+            if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
+              let statsURL = containerURL.appendingPathComponent("screen_time_stats.json")
+              if let data = try? Data(contentsOf: statsURL),
+                 let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let tm = json["insightsTodayMinutes"] as? Int, tm > 0 {
+                  cachedTotalMinutes = tm
+                } else if let tm = json["totalMinutes"] as? Int, tm > 0 {
+                  cachedTotalMinutes = tm
+                }
+                if let ym = json["insightsYesterdayMinutes"] as? Int, ym > 0 {
+                  cachedYesterdayMinutes = ym
+                } else if let ym = json["yesterdayTotalMinutes"] as? Int, ym > 0 {
+                  cachedYesterdayMinutes = ym
+                }
+                if let tst = json["insightsTimeSavedText"] as? String, !tst.isEmpty {
+                  cachedTimeSavedText = tst
+                } else if let tst = json["timeSavedText"] as? String, !tst.isEmpty {
+                  cachedTimeSavedText = tst
+                }
+                if let tsl = json["insightsTimeSavedLabel"] as? String, !tsl.isEmpty {
+                  cachedTimeSavedLabel = tsl
+                } else if let tsl = json["timeSavedLabel"] as? String, !tsl.isEmpty {
+                  cachedTimeSavedLabel = tsl
+                }
+                if let ist = json["insightsIsSavingTime"] as? Bool {
+                  cachedIsSavingTime = ist
+                } else if let ist = json["isSavingTime"] as? Bool {
+                  cachedIsSavingTime = ist
+                }
+              }
+            }
+
+            if cachedTimeSavedLabel.lowercased().contains("over") || cachedTimeSavedLabel.lowercased().contains("more") {
+              cachedIsSavingTime = false
+            } else if cachedTimeSavedLabel.lowercased().contains("save") || cachedTimeSavedLabel.lowercased().contains("track") {
+              cachedIsSavingTime = true
+            } else if cachedYesterdayMinutes > 0 && cachedTotalMinutes > 0 {
+              cachedIsSavingTime = cachedYesterdayMinutes >= cachedTotalMinutes
+            }
+
+            if cachedTimeSavedText.isEmpty && cachedTotalMinutes > 0 {
+              let baseline = cachedYesterdayMinutes > 0 ? cachedYesterdayMinutes : 300
+              let diff = abs(baseline - cachedTotalMinutes)
+              let hours = diff / 60
+              let mins = diff % 60
+              if hours > 0 {
+                cachedTimeSavedText = "\(hours)h \(mins)m"
+              } else {
+                cachedTimeSavedText = "\(mins)m"
+              }
+              if cachedTotalMinutes > baseline {
+                cachedTimeSavedLabel = "Over Yest."
+                cachedIsSavingTime = false
+              } else {
+                cachedTimeSavedLabel = "On Track to Save"
+                cachedIsSavingTime = true
+              }
+            }
 
             result([
               "authorized": isApproved,
@@ -1509,6 +1596,9 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
               "domainsCount": domainsCount,
               "totalMinutes": cachedTotalMinutes,
               "yesterdayTotalMinutes": cachedYesterdayMinutes,
+              "timeSavedText": cachedTimeSavedText,
+              "timeSavedLabel": cachedTimeSavedLabel,
+              "isSavingTime": cachedIsSavingTime,
               "apps": cachedApps
             ])
           case "applyShield":

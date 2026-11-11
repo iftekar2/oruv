@@ -206,20 +206,30 @@ nonisolated struct TotalActivityReport: DeviceActivityReportScene {
     func makeConfiguration(
         representing data: DeviceActivityResults<DeviceActivityData>
     ) async -> DailyScreenTimeConfiguration {
-        var totalSeconds: TimeInterval = 0
+        let now = Date()
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+
+        var todayTotalSeconds: TimeInterval = 0
+        var yesterdayTotalSeconds: TimeInterval = 0
         var appDurations: [ApplicationToken: (name: String, seconds: TimeInterval)] = [:]
 
         for await activityData in data {
             for await segment in activityData.activitySegments {
-                totalSeconds += segment.totalActivityDuration
-                for await categoryActivity in segment.categories {
-                    for await appActivity in categoryActivity.applications {
-                        let duration = appActivity.totalActivityDuration
-                        guard duration >= 60, let token = appActivity.application.token else { continue }
-                        let name = appActivity.application.localizedDisplayName ?? "App"
-                        let existing = appDurations[token]?.seconds ?? 0
-                        appDurations[token] = (name: name, seconds: existing + duration)
+                let isToday = segment.dateInterval.end > startOfToday
+                if isToday {
+                    todayTotalSeconds += segment.totalActivityDuration
+                    for await categoryActivity in segment.categories {
+                        for await appActivity in categoryActivity.applications {
+                            let duration = appActivity.totalActivityDuration
+                            guard duration >= 60, let token = appActivity.application.token else { continue }
+                            let name = appActivity.application.localizedDisplayName ?? "App"
+                            let existing = appDurations[token]?.seconds ?? 0
+                            appDurations[token] = (name: name, seconds: existing + duration)
+                        }
                     }
+                } else {
+                    yesterdayTotalSeconds += segment.totalActivityDuration
                 }
             }
         }
@@ -237,11 +247,66 @@ nonisolated struct TotalActivityReport: DeviceActivityReportScene {
             .prefix(5)
             .map { $0 }
 
-        let totalMinutes = max(0, Int(totalSeconds / 60))
+        let totalMinutes = max(0, Int(todayTotalSeconds / 60))
+        let yesterdayMinutes = max(0, Int(yesterdayTotalSeconds / 60))
 
         let appGroupId = "group.app.iftekarhossain.oruv"
         let sharedDefaults = UserDefaults(suiteName: appGroupId)
+
+        var baselineDailyMinutes = 300
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+            let fileURL = containerURL.appendingPathComponent("insights_metrics.json")
+            if let jsonData = try? Data(contentsOf: fileURL),
+               let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                if let base = json["baselineMinutes"] as? Int, base > 0 {
+                    baselineDailyMinutes = base
+                }
+            }
+        }
+
+        let cachedInsightsYesterday = sharedDefaults?.integer(forKey: "oruv_insights_yesterday_minutes") ?? 0
+        let realYesterday = yesterdayMinutes > 0 ? yesterdayMinutes : (cachedInsightsYesterday > 0 ? cachedInsightsYesterday : 0)
+        let effectiveYesterdayMinutes = realYesterday > 0 ? realYesterday : baselineDailyMinutes
+        let diffMinutes = effectiveYesterdayMinutes - totalMinutes
+        let isSavingTime = diffMinutes >= 0
+        let absDiffMinutes = abs(diffMinutes)
+        var timeSavedText = AppActivityItem.formatMinutes(absDiffMinutes)
+        var timeSavedLabel = isSavingTime ? "On Track to Save" : "Over Yest."
+
+        var isSaving = isSavingTime
+        if let insightsText = sharedDefaults?.string(forKey: "oruv_insights_time_saved_text"), !insightsText.isEmpty,
+           let insightsLabel = sharedDefaults?.string(forKey: "oruv_insights_time_saved_label"), !insightsLabel.isEmpty {
+            timeSavedText = insightsText
+            timeSavedLabel = insightsLabel
+            if let savedIsSaving = sharedDefaults?.object(forKey: "oruv_insights_is_saving_time") as? Bool {
+                isSaving = savedIsSaving
+            } else {
+                isSaving = !insightsLabel.lowercased().contains("over")
+            }
+        }
+
         sharedDefaults?.set(totalMinutes, forKey: "oruv_daily_total_minutes")
+        sharedDefaults?.set(effectiveYesterdayMinutes, forKey: "oruv_yesterday_total_minutes")
+        sharedDefaults?.set(timeSavedText, forKey: "oruv_time_saved_text")
+        sharedDefaults?.set(timeSavedLabel, forKey: "oruv_time_saved_label")
+        sharedDefaults?.set(isSaving, forKey: "oruv_is_saving_time")
+        sharedDefaults?.set(absDiffMinutes, forKey: "oruv_diff_minutes")
+
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+            let statsURL = containerURL.appendingPathComponent("screen_time_stats.json")
+            let statsDict: [String: Any] = [
+                "totalMinutes": totalMinutes,
+                "yesterdayTotalMinutes": effectiveYesterdayMinutes,
+                "timeSavedText": timeSavedText,
+                "timeSavedLabel": timeSavedLabel,
+                "isSavingTime": isSaving,
+                "diffMinutes": absDiffMinutes
+            ]
+            if let json = try? JSONSerialization.data(withJSONObject: statsDict, options: []) {
+                try? json.write(to: statsURL, options: .atomic)
+            }
+        }
+
         let appsPayload: [[String: Any]] = sortedItems.map { item in
             [
                 "id": item.id,
@@ -451,10 +516,42 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
         let isSavingTime = diffMinutes >= 0
         let absDiffMinutes = abs(diffMinutes)
         let timeSavedText = AppActivityItem.formatMinutes(absDiffMinutes)
-        let timeSavedLabel = isSavingTime ? "Time Saved" : "Over Yest."
+        let timeSavedLabel = isSavingTime ? "On Track to Save" : "Over Yest."
 
         sharedDefaults?.set(totalMins, forKey: "oruv_daily_total_minutes")
         sharedDefaults?.set(effectiveYesterdayMinutes, forKey: "oruv_yesterday_total_minutes")
+        sharedDefaults?.set(timeSavedText, forKey: "oruv_time_saved_text")
+        sharedDefaults?.set(timeSavedLabel, forKey: "oruv_time_saved_label")
+        sharedDefaults?.set(isSavingTime, forKey: "oruv_is_saving_time")
+        sharedDefaults?.set(absDiffMinutes, forKey: "oruv_diff_minutes")
+
+        // Dedicated Insights keys so Home page and widget can always access the exact Insights data
+        sharedDefaults?.set(timeSavedText, forKey: "oruv_insights_time_saved_text")
+        sharedDefaults?.set(timeSavedLabel, forKey: "oruv_insights_time_saved_label")
+        sharedDefaults?.set(isSavingTime, forKey: "oruv_insights_is_saving_time")
+        sharedDefaults?.set(totalMins, forKey: "oruv_insights_today_minutes")
+        sharedDefaults?.set(effectiveYesterdayMinutes, forKey: "oruv_insights_yesterday_minutes")
+        sharedDefaults?.set(absDiffMinutes, forKey: "oruv_insights_diff_minutes")
+
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+            let statsURL = containerURL.appendingPathComponent("screen_time_stats.json")
+            let statsDict: [String: Any] = [
+                "totalMinutes": totalMins,
+                "yesterdayTotalMinutes": effectiveYesterdayMinutes,
+                "timeSavedText": timeSavedText,
+                "timeSavedLabel": timeSavedLabel,
+                "isSavingTime": isSavingTime,
+                "diffMinutes": absDiffMinutes,
+                "insightsTimeSavedText": timeSavedText,
+                "insightsTimeSavedLabel": timeSavedLabel,
+                "insightsIsSavingTime": isSavingTime,
+                "insightsTodayMinutes": totalMins,
+                "insightsYesterdayMinutes": effectiveYesterdayMinutes
+            ]
+            if let json = try? JSONSerialization.data(withJSONObject: statsDict, options: []) {
+                try? json.write(to: statsURL, options: .atomic)
+            }
+        }
 
         let allTopApps = (distractingItems + otherItems)
             .sorted { $0.durationMinutes > $1.durationMinutes }
@@ -498,19 +595,30 @@ nonisolated struct AnchorTimeSavedReport: DeviceActivityReportScene {
 
         var todayTotalSeconds: TimeInterval = 0
         var yesterdayTotalSeconds: TimeInterval = 0
+        var appMap: [ApplicationToken: TimeInterval] = [:]
 
         for await activityData in data {
             for await segment in activityData.activitySegments {
                 let isToday = segment.dateInterval.end > startOfToday
                 if isToday {
                     todayTotalSeconds += segment.totalActivityDuration
+                    for await categoryActivity in segment.categories {
+                        for await appActivity in categoryActivity.applications {
+                            let duration = appActivity.totalActivityDuration
+                            guard duration >= 60, let token = appActivity.application.token else { continue }
+                            let existing = appMap[token] ?? 0
+                            appMap[token] = existing + duration
+                        }
+                    }
                 } else {
                     yesterdayTotalSeconds += segment.totalActivityDuration
                 }
             }
         }
 
-        let todayMins = max(0, Int(todayTotalSeconds / 60))
+        let appMins = appMap.values.reduce(0) { $0 + max(1, Int($1 / 60)) }
+        let rawTodayMins = max(0, Int(todayTotalSeconds / 60))
+        let todayMins = max(rawTodayMins, appMins)
         let yesterdayMins = max(0, Int(yesterdayTotalSeconds / 60))
 
         var baselineDailyMinutes = 300
@@ -530,7 +638,15 @@ nonisolated struct AnchorTimeSavedReport: DeviceActivityReportScene {
         let isSavingTime = diffMinutes >= 0
         let absDiffMinutes = abs(diffMinutes)
         let timeText = AppActivityItem.formatMinutes(absDiffMinutes)
-        let label = isSavingTime ? "On Track to Save" : "Projected Over"
+        let label = isSavingTime ? "On Track to Save" : "Over Yest."
+
+        let sharedDefaults = UserDefaults(suiteName: appGroupId)
+        sharedDefaults?.set(todayMins, forKey: "oruv_daily_total_minutes")
+        sharedDefaults?.set(effectiveYesterdayMinutes, forKey: "oruv_yesterday_total_minutes")
+        sharedDefaults?.set(timeText, forKey: "oruv_time_saved_text")
+        sharedDefaults?.set(label, forKey: "oruv_time_saved_label")
+        sharedDefaults?.set(isSavingTime, forKey: "oruv_is_saving_time")
+        sharedDefaults?.set(absDiffMinutes, forKey: "oruv_diff_minutes")
 
         return AnchorTimeSavedConfiguration(
             timeText: timeText,

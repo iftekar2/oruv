@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class DeepWorkAnchorCard extends StatelessWidget {
@@ -228,65 +230,79 @@ class DeepWorkAnchorCard extends StatelessWidget {
 
               // Column 2: Projected / On Track to Save
               Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      height:
-                          32, // Fixed height container to match top value line heights
-                      child: Center(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Icon(
-                              isSavingTime
-                                  ? Icons.arrow_drop_down_sharp
-                                  : Icons.arrow_drop_up_sharp,
-                              size: 25,
-                              color: isSavingTime
-                                  ? _accentGreen
-                                  : _coralRed,
+                child: (Platform.isIOS && isAuthorized)
+                    ? const SizedBox(
+                        height: 52,
+                        child: IgnorePointer(
+                          child: RepaintBoundary(
+                            child: UiKitView(
+                              viewType: 'oruv/anchor_time_saved',
+                              creationParamsCodec: StandardMessageCodec(),
+                              hitTestBehavior:
+                                  PlatformViewHitTestBehavior.transparent,
                             ),
-                            Flexible(
-                              child: Text(
-                                projectedTimeText ??
-                                    (protectedToday ?? focusedDuration),
-                                style: GoogleFonts.lora(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
-                                  color: isSavingTime
-                                      ? _accentGreen
-                                      : _coralRed,
-                                  letterSpacing: -0.2,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            height:
+                                32, // Fixed height container to match top value line heights
+                            child: Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    isSavingTime
+                                        ? Icons.arrow_drop_down_sharp
+                                        : Icons.arrow_drop_up_sharp,
+                                    size: 25,
+                                    color: isSavingTime
+                                        ? _accentGreen
+                                        : _coralRed,
+                                  ),
+                                  Flexible(
+                                    child: Text(
+                                      projectedTimeText ??
+                                          (protectedToday ?? focusedDuration),
+                                      style: GoogleFonts.lora(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                        color: isSavingTime
+                                            ? _accentGreen
+                                            : _coralRed,
+                                        letterSpacing: -0.2,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            projectedLabel ??
+                                (isSavingTime
+                                    ? 'On Track to Save'
+                                    : 'Over Yest.'),
+                            style: GoogleFonts.lora(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: _mutedText,
+                              height: 1.2,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      projectedLabel ??
-                          (isSavingTime
-                              ? 'On Track to Save'
-                              : 'Projected Over'),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _mutedText,
-                        height: 1.2,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
               ),
 
               Container(width: 1, height: 45, color: const Color(0xFFEEEAE6)),

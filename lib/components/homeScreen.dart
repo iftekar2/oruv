@@ -63,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       _syncShieldAndStats();
       _refreshBlockedAttempts();
+      _refreshDailyScreenTime();
     });
   }
 
@@ -89,6 +90,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       });
 
       await _syncShieldAndStats();
+
+      // Refresh again shortly after launch once the native extension finishes its report
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) _refreshDailyScreenTime();
+      });
+      Future.delayed(const Duration(milliseconds: 3500), () {
+        if (mounted) _refreshDailyScreenTime();
+      });
     } catch (e) {
       debugPrint('HomeScreen._initializeDataAndShields note: $e');
       if (mounted) {
@@ -103,11 +112,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     try {
       final screenTime = await ScreenTimeService.fetchDailyScreenTime();
       if (!mounted) return;
-      setState(() {
-        _screenTimeSnapshot = screenTime;
-        _topFiveApps = List.unmodifiable((screenTime.apps).take(5));
-      });
-      await _syncShieldAndStats();
+      if (_screenTimeSnapshot?.totalMinutes != screenTime.totalMinutes ||
+          _screenTimeSnapshot?.yesterdayMinutes != screenTime.yesterdayMinutes ||
+          _screenTimeSnapshot?.timeSavedText != screenTime.timeSavedText ||
+          _screenTimeSnapshot?.timeSavedLabel != screenTime.timeSavedLabel ||
+          _screenTimeSnapshot?.isSavingTime != screenTime.isSavingTime ||
+          _screenTimeSnapshot?.apps.length != screenTime.apps.length) {
+        setState(() {
+          _screenTimeSnapshot = screenTime;
+          _topFiveApps = List.unmodifiable((screenTime.apps).take(5));
+        });
+        await _syncShieldAndStats();
+      }
     } catch (e) {
       debugPrint('HomeScreen._refreshDailyScreenTime note: $e');
     }
@@ -140,6 +156,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       mindfulBreakMinutesToday: _mindfulBreakMinutesToday,
       todayScreenTimeMinutes: _screenTimeSnapshot?.totalMinutes,
       yesterdayScreenTimeMinutes: _screenTimeSnapshot?.yesterdayMinutes,
+      timeSavedText: _screenTimeSnapshot?.timeSavedText,
+      timeSavedLabel: _screenTimeSnapshot?.timeSavedLabel,
+      isSavingTimeOverride: _screenTimeSnapshot?.isSavingTime,
     );
 
     final sessionRemaining = snapshot.activeRule != null
@@ -462,6 +481,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       mindfulBreakMinutesToday: _mindfulBreakMinutesToday,
       todayScreenTimeMinutes: _screenTimeSnapshot?.totalMinutes,
       yesterdayScreenTimeMinutes: _screenTimeSnapshot?.yesterdayMinutes,
+      timeSavedText: _screenTimeSnapshot?.timeSavedText,
+      timeSavedLabel: _screenTimeSnapshot?.timeSavedLabel,
+      isSavingTimeOverride: _screenTimeSnapshot?.isSavingTime,
     );
 
     return Scaffold(

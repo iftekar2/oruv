@@ -81,7 +81,7 @@ class _InsightsPageState extends State<InsightsPage> {
     final isSavingTime = diff >= 0;
     final absDiff = diff.abs();
     final timeText = AppScreenTimeItem.formatMinutes(absDiff);
-    final label = isSavingTime ? 'Time Saved' : 'Over Yest.';
+    final label = isSavingTime ? 'On Track to Save' : 'Over Yest.';
     return (timeText, label, isSavingTime);
   }
 
