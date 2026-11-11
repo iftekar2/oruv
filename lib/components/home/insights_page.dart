@@ -195,7 +195,9 @@ class _InsightsPageState extends State<InsightsPage> {
             timeSavedDuration: timeSavedText,
             timeSavedLabel: timeSavedLabel,
             isSavingTime: isSavingTime,
-            pickupsPerHour: '$pickupsPerHour',
+            rightValue: isWeek ? '--' : '$pickupsPerHour',
+            rightLabel: isWeek ? 'vs Last Week' : 'Pickups/HR',
+            rightColor: _primaryText,
           ),
 
           const SizedBox(height: 26),
@@ -552,7 +554,9 @@ class _InsightsPageState extends State<InsightsPage> {
     required String timeSavedDuration,
     required String timeSavedLabel,
     required bool isSavingTime,
-    required String pickupsPerHour,
+    required String rightValue,
+    required String rightLabel,
+    required Color rightColor,
   }) {
     return Container(
       width: double.infinity,
@@ -573,7 +577,7 @@ class _InsightsPageState extends State<InsightsPage> {
             ),
           ),
           Container(width: 1, height: 28, color: const Color(0xFFEFE8E5)),
-          // Column 2: TIME SAVED
+          // Column 2: TIME SAVED / DAILY GOAL
           Expanded(
             child: _buildMetricColumn(
               value: timeSavedDuration,
@@ -582,12 +586,12 @@ class _InsightsPageState extends State<InsightsPage> {
             ),
           ),
           Container(width: 1, height: 28, color: const Color(0xFFEFE8E5)),
-          // Column 3: PICKUPS/HR
+          // Column 3: PICKUPS/HR or LAST WEEK
           Expanded(
             child: _buildMetricColumn(
-              value: pickupsPerHour,
-              label: 'Pickups/HR',
-              valueColor: _primaryText,
+              value: rightValue,
+              label: rightLabel,
+              valueColor: rightColor,
             ),
           ),
         ],
@@ -600,29 +604,40 @@ class _InsightsPageState extends State<InsightsPage> {
     required String label,
     required Color valueColor,
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: GoogleFonts.lora(
-            fontSize: 19,
-            fontWeight: FontWeight.w700,
-            color: valueColor,
-            height: 1.1,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: GoogleFonts.lora(
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+                color: valueColor,
+                height: 1.1,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.8,
-            color: _mutedText,
+          const SizedBox(height: 5),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.4,
+                color: _mutedText,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

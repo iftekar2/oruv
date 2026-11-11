@@ -376,7 +376,13 @@ struct InsightsActivityView: View {
         let savedText = isWeek ? configuration.weekTimeSavedText : configuration.timeSavedText
         let savedLabel = isWeek ? configuration.weekTimeSavedLabel : configuration.timeSavedLabel
         let isSaving = isWeek ? configuration.weekIsSavingTime : configuration.isSavingTime
-        let pickups = isWeek ? configuration.weekPickupsPerHour : configuration.pickupsPerHour
+        let rightValue = isWeek ? configuration.weekLastWeekText : "\(configuration.pickupsPerHour)"
+        let rightLabel = isWeek ? configuration.weekLastWeekLabel : "Pickups/HR"
+        let rightColor: Color = isWeek
+            ? (configuration.weekHasLastWeekData
+                ? (configuration.weekIsUnderLastWeek ? emeraldGreen : redBarColor)
+                : primaryText)
+            : primaryText
 
         return HStack(spacing: 0) {
             metricColumn(
@@ -402,9 +408,9 @@ struct InsightsActivityView: View {
                 .frame(width: 1, height: 28)
 
             metricColumn(
-                value: "\(pickups)",
-                label: "Pickups/HR",
-                valueColor: primaryText
+                value: rightValue,
+                label: rightLabel,
+                valueColor: rightColor
             )
             .frame(maxWidth: .infinity)
         }

@@ -93,7 +93,10 @@ struct InsightsScreenTimeConfiguration: Sendable {
     let weekTimeSavedText: String
     let weekTimeSavedLabel: String
     let weekIsSavingTime: Bool
-    let weekPickupsPerHour: Int
+    let weekHasLastWeekData: Bool
+    let weekLastWeekText: String
+    let weekLastWeekLabel: String
+    let weekIsUnderLastWeek: Bool
     let weekDays: [WeekdayScreenTimeItem]
     let weekDistractingApps: [InsightsAppActivityItem]
     let weekOtherApps: [InsightsAppActivityItem]
@@ -386,6 +389,7 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
         let weekday = calendar.component(.weekday, from: now) // 1 = Sun ... 7 = Sat
         let todayIndex = max(0, min(6, weekday - 1))
         let startOfWeekSunday = calendar.date(byAdding: .day, value: -todayIndex, to: startOfToday) ?? startOfToday
+        let startOfLastWeekSunday = calendar.date(byAdding: .day, value: -7, to: startOfWeekSunday) ?? startOfWeekSunday.addingTimeInterval(-7 * 86400)
         let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday.addingTimeInterval(-86400)
 
         var todayTotalSeconds: TimeInterval = 0
@@ -395,7 +399,8 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
 
         var weekDaySeconds: [TimeInterval] = Array(repeating: 0, count: 7)
         var weekDayAppSeconds: [TimeInterval] = Array(repeating: 0, count: 7)
-        var weekPickups: Int = 0
+        var lastWeekDaySeconds: [TimeInterval] = Array(repeating: 0, count: 7)
+        var lastWeekDayAppSeconds: [TimeInterval] = Array(repeating: 0, count: 7)
 
         struct RawAppAccumulator {
             var name: String
@@ -455,6 +460,7 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
                 let isToday = segDayStart >= startOfToday || segment.dateInterval.end > startOfToday
                 let isYesterday = !isToday && segDayStart == startOfYesterday
                 let isInCurrentWeek = segDayStart >= startOfWeekSunday && segDayStart <= startOfToday
+                let isInLastWeek = segDayStart >= startOfLastWeekSunday && segDayStart < startOfWeekSunday
                 let segDayIdx = max(0, min(6, calendar.component(.weekday, from: segDayStart) - 1))
 
                 if isToday {
@@ -471,7 +477,8 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
 
                 if isInCurrentWeek && segDayIdx <= todayIndex {
                     weekDaySeconds[segDayIdx] += segment.totalActivityDuration
-                    weekPickups += segment.totalPickupsWithoutApplicationActivity
+                } else if isInLastWeek {
+                    lastWeekDaySeconds[segDayIdx] += segment.totalActivityDuration
                 }
 
                 for await categoryActivity in segment.categories {
@@ -486,8 +493,9 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
                             todayPickups += pickups
                         }
                         if isInCurrentWeek && segDayIdx <= todayIndex {
-                            weekPickups += pickups
                             weekDayAppSeconds[segDayIdx] += duration
+                        } else if isInLastWeek {
+                            lastWeekDayAppSeconds[segDayIdx] += duration
                         }
 
                         guard duration > 0, let token = appActivity.application.token else { continue }
@@ -665,16 +673,30 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
         let weekTimeSavedText = AppActivityItem.formatMinutes(abs(weekDiffMinutes))
         let weekTimeSavedLabel = weekIsSavingTime ? "Under Daily Goal" : "Over Daily Goal"
 
-        let priorActiveDays = (0..<todayIndex).filter { weekDays[$0].totalMinutes > 0 }.count
-        let weekElapsedHours = max(1.0, Double(priorActiveDays) * 16.0 + elapsedHours)
-        let weekPickupsPerHour: Int
-        if weekPickups > 0 {
-            weekPickupsPerHour = max(1, Int(round(Double(weekPickups) / weekElapsedHours)))
-        } else if weekTotalMins > 0 {
-            weekPickupsPerHour = max(1, Int(round(Double(weekAppMap.count) / weekElapsedHours)))
-        } else {
-            weekPickupsPerHour = 0
+        var lastWeekDayMins: [Int] = Array(repeating: 0, count: 7)
+        for idx in 0..<7 {
+            lastWeekDayMins[idx] = max(0, Int(round(max(lastWeekDaySeconds[idx], lastWeekDayAppSeconds[idx]) / 60.0)))
         }
+        let lastWeekSamePeriodMins = (0...todayIndex).reduce(0) { $0 + lastWeekDayMins[$1] }
+        let lastWeekTotalMins = lastWeekDayMins.reduce(0, +)
+        let lastWeekActiveDays = lastWeekDayMins.filter { $0 > 0 }.count
+
+        let effectiveLastWeekMins: Int
+        if lastWeekSamePeriodMins > 0 {
+            effectiveLastWeekMins = lastWeekSamePeriodMins
+        } else if lastWeekTotalMins > 0 && lastWeekActiveDays > 0 {
+            effectiveLastWeekMins = Int(round(Double(lastWeekTotalMins) / Double(lastWeekActiveDays) * Double(elapsedDaysCount)))
+        } else {
+            effectiveLastWeekMins = 0
+        }
+
+        let weekHasLastWeekData = effectiveLastWeekMins > 0
+        let lastWeekDiffMinutes = effectiveLastWeekMins - weekTotalMins
+        let weekIsUnderLastWeek = lastWeekDiffMinutes >= 0
+        let weekLastWeekText = weekHasLastWeekData ? AppActivityItem.formatMinutes(abs(lastWeekDiffMinutes)) : "--"
+        let weekLastWeekLabel = weekHasLastWeekData
+            ? (weekIsUnderLastWeek ? "Under Last Week" : "Over Last Week")
+            : "vs Last Week"
 
         sharedDefaults?.set(totalMins, forKey: "oruv_daily_total_minutes")
         sharedDefaults?.set(effectiveYesterdayMinutes, forKey: "oruv_yesterday_total_minutes")
@@ -744,7 +766,10 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
             weekTimeSavedText: weekTimeSavedText,
             weekTimeSavedLabel: weekTimeSavedLabel,
             weekIsSavingTime: weekIsSavingTime,
-            weekPickupsPerHour: weekPickupsPerHour,
+            weekHasLastWeekData: weekHasLastWeekData,
+            weekLastWeekText: weekLastWeekText,
+            weekLastWeekLabel: weekLastWeekLabel,
+            weekIsUnderLastWeek: weekIsUnderLastWeek,
             weekDays: weekDays,
             weekDistractingApps: weekDistractingItems,
             weekOtherApps: weekOtherItems
