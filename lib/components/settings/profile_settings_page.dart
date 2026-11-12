@@ -319,26 +319,11 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leadingWidth: 68,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 18, top: 6, bottom: 6),
-          child: IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(
-              Icons.chevron_left_rounded,
-              color: SettingsPalette.primaryText,
-              size: 26,
-            ),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(50),
-                side: const BorderSide(
-                  color: SettingsPalette.cardBorder,
-                  width: 1.2,
-                ),
-              ),
-            ),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(
+            Icons.arrow_back,
+            color: SettingsPalette.primaryText,
           ),
         ),
         centerTitle: true,
