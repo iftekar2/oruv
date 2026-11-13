@@ -485,9 +485,9 @@ class _WelcomePageState extends State<WelcomePage>
       key: key,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 22),
-        SizedBox(
-          height: 38,
+        const SizedBox(height: 20),
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 38),
           child: Center(
             child: Text(
               title,
@@ -503,8 +503,8 @@ class _WelcomePageState extends State<WelcomePage>
           ),
         ),
         const SizedBox(height: 14),
-        SizedBox(
-          height: 44,
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
           child: Center(
             child: Text(
               subtitle,
@@ -518,8 +518,11 @@ class _WelcomePageState extends State<WelcomePage>
             ),
           ),
         ),
-        const SizedBox(height: 24),
-        SizedBox(height: 48, child: Center(child: metricsChild)),
+        const SizedBox(height: 20),
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: Center(child: metricsChild),
+        ),
         const SizedBox(height: 8),
       ],
     );
@@ -547,7 +550,7 @@ class _WelcomePageState extends State<WelcomePage>
                     color: const Color(0xFF1E1A1D),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   leftLabel,
                   style: GoogleFonts.inter(
@@ -572,7 +575,7 @@ class _WelcomePageState extends State<WelcomePage>
                     color: const Color(0xFF1E1A1D),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   rightLabel,
                   style: GoogleFonts.inter(
