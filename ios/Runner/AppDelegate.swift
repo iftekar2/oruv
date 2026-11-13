@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 import SwiftUI
 import Combine
+import UserNotifications
 #if canImport(FamilyControls)
 import FamilyControls
 import ManagedSettings
@@ -23,6 +24,10 @@ class ScreenTimeManager: ObservableObject {
   private var hasAppliedInitialShieldState: Bool = false
   private var isResettingState: Bool = false
   var resolvedTokenNamesCache: [String: String] = [:]
+
+  private var breakTimer: Timer?
+  private var breakBgTaskId: UIBackgroundTaskIdentifier = .invalid
+  private(set) var mindfulBreakEndTime: Date? = nil
 
   @Published private(set) var orderedAppTokens: [ApplicationToken] = []
   @Published private(set) var orderedCategoryTokens: [ActivityCategoryToken] = []
@@ -107,11 +112,115 @@ class ScreenTimeManager: ObservableObject {
     store.shield.webDomains = nil
   }
 
-  func syncShield(shouldBlock: Bool) {
+  func syncShield(shouldBlock: Bool, breakEndTime: Date? = nil) {
     if shouldBlock {
+      cancelMindfulBreak()
       applyShield()
     } else {
-      clearShield()
+      if let breakEndTime = breakEndTime {
+        if Date() >= breakEndTime {
+          cancelMindfulBreak()
+          applyShield(force: true)
+          return
+        }
+        clearShield()
+        scheduleMindfulBreak(until: breakEndTime)
+      } else {
+        cancelMindfulBreak()
+        clearShield()
+      }
+    }
+  }
+
+  func scheduleMindfulBreak(until targetDate: Date) {
+    cancelMindfulBreakTimerOnly()
+    mindfulBreakEndTime = targetDate
+    UserDefaults(suiteName: Self.appGroupId)?.set(
+      targetDate.timeIntervalSince1970,
+      forKey: "oruv_mindful_break_end_time"
+    )
+
+    if Date() >= targetDate {
+      applyShield(force: true)
+      mindfulBreakEndTime = nil
+      UserDefaults(suiteName: Self.appGroupId)?.removeObject(forKey: "oruv_mindful_break_end_time")
+      return
+    }
+
+    let interval = max(1.0, targetDate.timeIntervalSinceNow)
+    breakTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+      self?.applyShield(force: true)
+      self?.cancelMindfulBreak()
+    }
+
+    if breakBgTaskId == .invalid {
+      breakBgTaskId = UIApplication.shared.beginBackgroundTask(withName: "MindfulBreakReShield") { [weak self] in
+        guard let self = self else { return }
+        if let end = self.mindfulBreakEndTime, Date() >= end {
+          self.applyShield(force: true)
+        }
+        if self.breakBgTaskId != .invalid {
+          UIApplication.shared.endBackgroundTask(self.breakBgTaskId)
+          self.breakBgTaskId = .invalid
+        }
+      }
+    }
+
+    scheduleBreakEndNotification(at: targetDate)
+  }
+
+  func cancelMindfulBreak() {
+    cancelMindfulBreakTimerOnly()
+    mindfulBreakEndTime = nil
+    UserDefaults(suiteName: Self.appGroupId)?.removeObject(forKey: "oruv_mindful_break_end_time")
+    UNUserNotificationCenter.current().removePendingNotificationRequests(
+      withIdentifiers: ["oruv.mindful_break_ended"]
+    )
+  }
+
+  private func cancelMindfulBreakTimerOnly() {
+    breakTimer?.invalidate()
+    breakTimer = nil
+    if breakBgTaskId != .invalid {
+      UIApplication.shared.endBackgroundTask(breakBgTaskId)
+      breakBgTaskId = .invalid
+    }
+  }
+
+  func checkMindfulBreakExpiry() {
+    let sharedDefaults = UserDefaults(suiteName: Self.appGroupId)
+    let storedTimestamp = sharedDefaults?.double(forKey: "oruv_mindful_break_end_time") ?? 0
+    if storedTimestamp > 0 {
+      let targetDate = Date(timeIntervalSince1970: storedTimestamp)
+      if Date() >= targetDate {
+        sharedDefaults?.removeObject(forKey: "oruv_mindful_break_end_time")
+        applyShield(force: true)
+        cancelMindfulBreak()
+      }
+    }
+  }
+
+  private func scheduleBreakEndNotification(at date: Date) {
+    let center = UNUserNotificationCenter.current()
+    center.getNotificationSettings { settings in
+      guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+      let content = UNMutableNotificationContent()
+      content.title = "Mindful Break Ended"
+      content.body = "Your focus shields have automatically resumed and blocked apps are locked."
+      content.sound = .default
+
+      let triggerDate = Calendar.current.dateComponents(
+        [.year, .month, .day, .hour, .minute, .second],
+        from: date
+      )
+      let trigger = UNCalendarNotificationTrigger(dateMatching: triggerDate, repeats: false)
+      let request = UNNotificationRequest(
+        identifier: "oruv.mindful_break_ended",
+        content: content,
+        trigger: trigger
+      )
+      center.removePendingNotificationRequests(withIdentifiers: ["oruv.mindful_break_ended"])
+      center.add(request)
     }
   }
 
@@ -206,6 +315,7 @@ class ScreenTimeManager: ObservableObject {
   }
 
   func resetLocalState(clearSelection: Bool) {
+    cancelMindfulBreak()
     clearShield(force: true)
     hasAppliedInitialShieldState = false
 
@@ -1344,6 +1454,15 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    super.applicationDidBecomeActive(application)
+    #if canImport(FamilyControls)
+    if #available(iOS 16.0, *) {
+      ScreenTimeManager.shared.checkMindfulBreakExpiry()
+    }
+    #endif
+  }
+
   // MARK: - UISceneSession Lifecycle
 
   override func application(
@@ -1704,7 +1823,14 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
           case "syncShield":
             let args = call.arguments as? [String: Any]
             let shouldBlock = (args?["shouldBlock"] as? Bool) ?? true
-            ScreenTimeManager.shared.syncShield(shouldBlock: shouldBlock)
+            let breakEndTimeMs = args?["breakEndTimeMs"] as? Double
+            let breakEndDate: Date? = {
+              if let ms = breakEndTimeMs, ms > 0 {
+                return Date(timeIntervalSince1970: ms / 1000.0)
+              }
+              return nil
+            }()
+            ScreenTimeManager.shared.syncShield(shouldBlock: shouldBlock, breakEndTime: breakEndDate)
 
             let sessionRemaining = args?["sessionRemaining"] as? String
             let protectedToday = args?["protectedToday"] as? String

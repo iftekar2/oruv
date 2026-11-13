@@ -23,6 +23,8 @@ class ScheduleService {
   static Future<void> syncNativeShield({
     required List<ScheduleRuleModel> rules,
     required bool isOnMindfulBreak,
+    DateTime? breakEndTime,
+    int? breakDurationMinutes,
     String? sessionRemaining,
     String? protectedToday,
     String? screenTimeToday,
@@ -33,8 +35,11 @@ class ScheduleService {
   }) async {
     if (!Platform.isIOS) return;
 
+    final effectiveIsOnBreak = isOnMindfulBreak &&
+        (breakEndTime == null || DateTime.now().isBefore(breakEndTime));
+
     final hasActiveRunningSchedule =
-        !isOnMindfulBreak && rules.any((r) => r.isCurrentlyRunning);
+        !effectiveIsOnBreak && rules.any((r) => r.isCurrentlyRunning);
 
     int baselineMinutes = 300;
     final onboardingChoice = OnboardingData.instance.dailyScreenTime;
@@ -53,8 +58,12 @@ class ScheduleService {
       currentUserId = Supabase.instance.client.auth.currentUser?.id;
     } catch (_) {}
 
+    final breakEndTimeMs = effectiveIsOnBreak && breakEndTime != null
+        ? breakEndTime.millisecondsSinceEpoch.toDouble()
+        : null;
+
     final signature =
-        '${currentUserId ?? 'anon'}|$hasActiveRunningSchedule|$baselineMinutes|$sessionRemaining|$protectedToday|$screenTimeToday|$scheduleTitle|$projectedTimeText|$projectedLabel|$isSavingTime';
+        '${currentUserId ?? 'anon'}|$hasActiveRunningSchedule|$effectiveIsOnBreak|$breakEndTimeMs|$baselineMinutes|$sessionRemaining|$protectedToday|$screenTimeToday|$scheduleTitle|$projectedTimeText|$projectedLabel|$isSavingTime';
     if (_lastNativeShieldSignature == signature) {
       return;
     }
@@ -64,6 +73,9 @@ class ScheduleService {
       await _screenTimeChannel.invokeMethod('syncShield', {
         'shouldBlock': hasActiveRunningSchedule,
         'baselineMinutes': baselineMinutes,
+        if (breakEndTimeMs != null) 'breakEndTimeMs': breakEndTimeMs,
+        if (breakDurationMinutes != null)
+          'breakDurationMinutes': breakDurationMinutes,
         if (sessionRemaining != null) 'sessionRemaining': sessionRemaining,
         if (protectedToday != null) 'protectedToday': protectedToday,
         if (screenTimeToday != null) 'screenTimeToday': screenTimeToday,

@@ -48,8 +48,20 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   }
 
   func sceneDidDisconnect(_ scene: UIScene) {}
-  func sceneDidBecomeActive(_ scene: UIScene) {}
+  func sceneDidBecomeActive(_ scene: UIScene) {
+    #if canImport(FamilyControls)
+    if #available(iOS 16.0, *) {
+      ScreenTimeManager.shared.checkMindfulBreakExpiry()
+    }
+    #endif
+  }
   func sceneWillResignActive(_ scene: UIScene) {}
-  func sceneWillEnterForeground(_ scene: UIScene) {}
+  func sceneWillEnterForeground(_ scene: UIScene) {
+    #if canImport(FamilyControls)
+    if #available(iOS 16.0, *) {
+      ScreenTimeManager.shared.checkMindfulBreakExpiry()
+    }
+    #endif
+  }
   func sceneDidEnterBackground(_ scene: UIScene) {}
 }

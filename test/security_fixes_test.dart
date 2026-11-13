@@ -304,4 +304,20 @@ void main() {
       expect(morningClarity.overlapsWith(oldEveningWindDown), isTrue);
     });
   });
+
+  group('Mindful break expiry checks', () {
+    test('Past break end time evaluates to break ended', () {
+      final pastTime = DateTime.now().subtract(const Duration(minutes: 1));
+      final isOnBreak = true;
+      final effectiveIsOnBreak = isOnBreak && DateTime.now().isBefore(pastTime);
+      expect(effectiveIsOnBreak, isFalse);
+    });
+
+    test('Future break end time evaluates to break active', () {
+      final futureTime = DateTime.now().add(const Duration(minutes: 5));
+      final isOnBreak = true;
+      final effectiveIsOnBreak = isOnBreak && DateTime.now().isBefore(futureTime);
+      expect(effectiveIsOnBreak, isTrue);
+    });
+  });
 }

@@ -17,6 +17,7 @@ import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/components/settings/profile_settings_page.dart';
 import 'package:oruv/services/schedule_service.dart';
 import 'package:oruv/services/screen_time_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -46,6 +47,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _hasMostBlockedNativeToken = false;
   int _lastClockMinute = -1;
 
+  static const String _keyBreakEndTimeMs = 'mindful_break_end_time_ms';
+  static const String _keyBreakTotalSec = 'mindful_break_total_seconds';
+  static const String _keyBreakMinsToday = 'mindful_break_minutes_today';
+  static const String _keyBreakDateStr = 'mindful_break_date_str';
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Refresh live progress %, remaining time, and shield enforcement every 15s
     _liveClockTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (!mounted) return;
+      _checkMindfulBreakExpiry();
       final currentNow = DateTime.now();
       final currentMinute = currentNow.hour * 60 + currentNow.minute;
       if (currentMinute != _lastClockMinute) {
@@ -72,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _initializeDataAndShields() async {
     try {
       await OnboardingService.loadOnboardingData();
+      await _restoreMindfulBreakState();
       await ScheduleService.refreshNativeSelectionCounts(
         onCountUpdated: (_) {
           if (mounted) {
@@ -116,7 +124,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final screenTime = await ScreenTimeService.fetchDailyScreenTime();
       if (!mounted) return;
       if (_screenTimeSnapshot?.totalMinutes != screenTime.totalMinutes ||
-          _screenTimeSnapshot?.yesterdayMinutes != screenTime.yesterdayMinutes ||
+          _screenTimeSnapshot?.yesterdayMinutes !=
+              screenTime.yesterdayMinutes ||
           _screenTimeSnapshot?.timeSavedText != screenTime.timeSavedText ||
           _screenTimeSnapshot?.timeSavedLabel != screenTime.timeSavedLabel ||
           _screenTimeSnapshot?.isSavingTime != screenTime.isSavingTime ||
@@ -181,6 +190,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await ScheduleService.syncNativeShield(
       rules: _rules,
       isOnMindfulBreak: _isOnMindfulBreak,
+      breakEndTime: _breakEndTime,
+      breakDurationMinutes: _breakEndTime != null
+          ? ((_mindfulBreakTotalSeconds + 59) ~/ 60)
+          : null,
       sessionRemaining: sessionRemaining,
       protectedToday: snapshot.shieldDiffFormatted,
       screenTimeToday: screenTimeToday,
@@ -200,8 +213,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Re-query real usage when returning from Settings / other apps.
     if (state == AppLifecycleState.resumed) {
+      _checkMindfulBreakExpiry();
+      _syncShieldAndStats();
       _refreshDailyScreenTime();
       _refreshBlockedAttempts();
     }
@@ -215,15 +229,125 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  void _handleTakeMindfulBreak() {
-    if (_isOnMindfulBreak) {
+  void _checkMindfulBreakExpiry() {
+    if (!_isOnMindfulBreak) return;
+    final now = DateTime.now();
+    if (_breakEndTime != null &&
+        (now.isAfter(_breakEndTime!) || now.isAtSameMomentAs(_breakEndTime!))) {
       _mindfulBreakTimer?.cancel();
+      _mindfulBreakTimer = null;
       setState(() {
         _isOnMindfulBreak = false;
         _mindfulBreakRemainingSeconds = 0;
         _mindfulBreakTotalSeconds = 0;
         _breakEndTime = null;
       });
+      _persistMindfulBreakState();
+      _syncShieldAndStats();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Mindful break ended \u2013 Focus mode and shields automatically restarted!',
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Color(0xFF1D6F58),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } else if (_breakEndTime != null) {
+      final remaining = _breakEndTime!.difference(now).inSeconds;
+      if (remaining != _mindfulBreakRemainingSeconds) {
+        setState(() {
+          _mindfulBreakRemainingSeconds = remaining.clamp(
+            0,
+            _mindfulBreakTotalSeconds > 0
+                ? _mindfulBreakTotalSeconds
+                : remaining,
+          );
+        });
+      }
+    }
+  }
+
+  void _startMindfulBreakTicker() {
+    _mindfulBreakTimer?.cancel();
+    _mindfulBreakTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      _checkMindfulBreakExpiry();
+      if (!_isOnMindfulBreak) {
+        timer.cancel();
+        _mindfulBreakTimer = null;
+      }
+    });
+  }
+
+  Future<void> _persistMindfulBreakState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_isOnMindfulBreak && _breakEndTime != null) {
+        await prefs.setInt(
+          _keyBreakEndTimeMs,
+          _breakEndTime!.millisecondsSinceEpoch,
+        );
+        await prefs.setInt(_keyBreakTotalSec, _mindfulBreakTotalSeconds);
+      } else {
+        await prefs.remove(_keyBreakEndTimeMs);
+        await prefs.remove(_keyBreakTotalSec);
+      }
+      final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+      await prefs.setString(_keyBreakDateStr, todayStr);
+      await prefs.setInt(_keyBreakMinsToday, _mindfulBreakMinutesToday);
+    } catch (_) {}
+  }
+
+  Future<void> _restoreMindfulBreakState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+      final savedDate = prefs.getString(_keyBreakDateStr);
+      if (savedDate == todayStr) {
+        _mindfulBreakMinutesToday = prefs.getInt(_keyBreakMinsToday) ?? 0;
+      } else {
+        _mindfulBreakMinutesToday = 0;
+        await prefs.setString(_keyBreakDateStr, todayStr);
+        await prefs.setInt(_keyBreakMinsToday, 0);
+      }
+
+      final endMs = prefs.getInt(_keyBreakEndTimeMs);
+      final totalSec = prefs.getInt(_keyBreakTotalSec) ?? 0;
+      if (endMs != null && endMs > 0) {
+        final targetEnd = DateTime.fromMillisecondsSinceEpoch(endMs);
+        final now = DateTime.now();
+        if (now.isBefore(targetEnd)) {
+          _isOnMindfulBreak = true;
+          _breakEndTime = targetEnd;
+          _mindfulBreakTotalSeconds = totalSec;
+          _mindfulBreakRemainingSeconds = targetEnd.difference(now).inSeconds;
+          _startMindfulBreakTicker();
+        } else {
+          await prefs.remove(_keyBreakEndTimeMs);
+          await prefs.remove(_keyBreakTotalSec);
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _handleTakeMindfulBreak() {
+    if (_isOnMindfulBreak) {
+      _mindfulBreakTimer?.cancel();
+      _mindfulBreakTimer = null;
+      setState(() {
+        _isOnMindfulBreak = false;
+        _mindfulBreakRemainingSeconds = 0;
+        _mindfulBreakTotalSeconds = 0;
+        _breakEndTime = null;
+      });
+      _persistMindfulBreakState();
       _syncShieldAndStats();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -255,47 +379,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _breakEndTime = targetEndTime;
             _mindfulBreakMinutesToday += minutes;
           });
+          _persistMindfulBreakState();
           _syncShieldAndStats();
-
-          _mindfulBreakTimer = Timer.periodic(const Duration(seconds: 1), (
-            timer,
-          ) {
-            if (!mounted) {
-              timer.cancel();
-              return;
-            }
-            final now = DateTime.now();
-            final remaining = _breakEndTime != null
-                ? _breakEndTime!.difference(now).inSeconds
-                : _mindfulBreakRemainingSeconds - 1;
-
-            if (remaining <= 0) {
-              timer.cancel();
-              setState(() {
-                _isOnMindfulBreak = false;
-                _mindfulBreakRemainingSeconds = 0;
-                _mindfulBreakTotalSeconds = 0;
-                _breakEndTime = null;
-              });
-              _syncShieldAndStats();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Mindful break ended \u2013 Focus mode and shields automatically restarted!',
-                    ),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: Color(0xFF1D6F58),
-                    duration: Duration(seconds: 4),
-                  ),
-                );
-              }
-            } else {
-              setState(() {
-                _mindfulBreakRemainingSeconds = remaining;
-              });
-            }
-          });
+          _startMindfulBreakTicker();
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -359,8 +445,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _handleRuleToggled(String ruleId, bool isActive) async {
     if (isActive) {
       final rule = _rules.firstWhere((r) => r.id == ruleId);
-      final otherActiveRules =
-          _rules.where((r) => r.isActive && r.id != ruleId).toList();
+      final otherActiveRules = _rules
+          .where((r) => r.isActive && r.id != ruleId)
+          .toList();
       final conflict = ScheduleRuleModel.findConflictingSchedule(
         startTime: rule.startTime,
         endTime: rule.endTime,
@@ -559,7 +646,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               progress: snapshot.progress,
               sessionRemaining: snapshot.activeRule != null
                   ? ScheduleRuleModel.formatDurationMinutes(
-                      snapshot.activeRule!.currentCycleRemainingMinutes)
+                      snapshot.activeRule!.currentCycleRemainingMinutes,
+                    )
                   : '0m',
               protectedToday: snapshot.projectedTimeText,
               isSavingTime: snapshot.isSavingTime,
@@ -568,10 +656,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               mostBlockedAppName: _mostBlockedAppName,
               mostBlockedAppCount: _mostBlockedAppCount,
               hasMostBlockedNativeToken: _hasMostBlockedNativeToken,
-              screenTimeToday: (_screenTimeSnapshot?.totalMinutes != null &&
+              screenTimeToday:
+                  (_screenTimeSnapshot?.totalMinutes != null &&
                       _screenTimeSnapshot!.totalMinutes! > 0)
                   ? ScheduleRuleModel.formatDurationMinutes(
-                      _screenTimeSnapshot!.totalMinutes!)
+                      _screenTimeSnapshot!.totalMinutes!,
+                    )
                   : '0m',
               focusedDuration: snapshot.focusedDuration,
               focusScore: snapshot.focusScore,
