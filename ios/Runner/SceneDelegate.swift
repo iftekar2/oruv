@@ -1,5 +1,6 @@
 import UIKit
 import Flutter
+import app_links
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   var window: UIWindow?
@@ -26,6 +27,24 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       self.window = window
       window.makeKeyAndVisible()
     }
+
+    if let url = connectionOptions.urlContexts.first?.url {
+      AppLinks.shared.handleLink(url: url)
+    } else if let webpageURL = connectionOptions.userActivities.first?.webpageURL {
+      AppLinks.shared.handleLink(url: webpageURL)
+    }
+  }
+
+  func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+    for context in URLContexts {
+      AppLinks.shared.handleLink(url: context.url)
+    }
+  }
+
+  func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+    if let webpageURL = userActivity.webpageURL {
+      AppLinks.shared.handleLink(url: webpageURL)
+    }
   }
 
   func sceneDidDisconnect(_ scene: UIScene) {}
@@ -34,4 +53,3 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   func sceneWillEnterForeground(_ scene: UIScene) {}
   func sceneDidEnterBackground(_ scene: UIScene) {}
 }
-

@@ -4,7 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
-  quickjs_engine
+  flutter_secure_storage_windows
   url_launcher_windows
 )
 

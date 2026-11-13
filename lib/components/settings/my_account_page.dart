@@ -4,8 +4,8 @@ import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/components/settings/settings_sheets.dart';
 import 'package:oruv/components/welcomePages/screenFour.dart';
-import 'package:oruv/services/google_auth_service.dart';
-import 'package:oruv/services/preferences_service.dart';
+import 'package:oruv/services/account_lifecycle_service.dart';
+import 'package:oruv/services/auth_redirect_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MyAccountPage extends StatefulWidget {
@@ -207,13 +207,21 @@ class _MyAccountPageState extends State<MyAccountPage> {
                       onPressed: () async {
                         Navigator.pop(sheetContext);
                         try {
+                          await AuthRedirectService.markPendingFlow(
+                            AuthRedirectFlow.resetPassword,
+                            userId: Supabase.instance.client.auth.currentUser?.id,
+                          );
                           await Supabase.instance.client.auth
                               .resetPasswordForEmail(
                                 email,
-                                redirectTo: 'oruv://reset-password',
+                                redirectTo:
+                                    AuthRedirectService.resetPasswordRedirectUrl,
                               );
                           _showSnackBar('Password reset email sent to $email');
                         } catch (_) {
+                          await AuthRedirectService.clearPendingFlow(
+                            AuthRedirectFlow.resetPassword,
+                          );
                           _showSnackBar(
                             'Could not send password reset email',
                             isError: true,
@@ -303,10 +311,7 @@ class _MyAccountPageState extends State<MyAccountPage> {
 
     setState(() => _isBusy = true);
     try {
-      await GoogleAuthService.signOut();
-      await Supabase.instance.client.auth.signOut();
-      await PreferencesService.setCompletedOnboarding(true);
-      OnboardingData.instance.reset();
+      await AccountLifecycleService.signOut();
     } catch (e) {
       debugPrint('Sign out error: $e');
     } finally {
@@ -444,24 +449,31 @@ class _MyAccountPageState extends State<MyAccountPage> {
     if (shouldDelete != true) return;
 
     setState(() => _isBusy = true);
+    var deleted = false;
     try {
-      await OnboardingService.deleteAccount();
-      await GoogleAuthService.signOut();
-      await Supabase.instance.client.auth.signOut();
-      await PreferencesService.clearOnboarding();
-      OnboardingData.instance.reset();
+      deleted = await AccountLifecycleService.deleteAccountAndSignOut();
     } catch (e) {
       debugPrint('Delete account error: $e');
     } finally {
       if (mounted) {
         setState(() => _isBusy = false);
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const ScreenFour()),
-          (route) => false,
-        );
       }
     }
+
+    if (!mounted) return;
+    if (!deleted) {
+      _showSnackBar(
+        'Could not delete your account right now. Please try again.',
+        isError: true,
+      );
+      return;
+    }
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const ScreenFour()),
+      (route) => false,
+    );
   }
 
   @override

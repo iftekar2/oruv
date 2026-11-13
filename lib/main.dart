@@ -8,24 +8,59 @@ import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/components/welcomePages/screenFour.dart';
 import 'package:oruv/components/welcomePages/welcomePage.dart';
+import 'package:oruv/services/account_lifecycle_service.dart';
+import 'package:oruv/services/auth_redirect_service.dart';
 import 'package:oruv/services/preferences_service.dart';
+import 'package:oruv/services/secure_supabase_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await dotenv.load(fileName: ".env");
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('Note: .env file not loaded or not bundled: $e');
+  }
 
-  final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+  const defineSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const defineSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON');
+
+  final supabaseUrl =
+      (dotenv.env['SUPABASE_URL']?.trim().isNotEmpty == true
+              ? dotenv.env['SUPABASE_URL']
+              : defineSupabaseUrl)
+          ?.trim() ??
+      '';
+
   final supabaseAnonKey =
-      dotenv.env['SUPABASE_ANON'] ?? dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+      ((dotenv.env['SUPABASE_ANON'] ?? dotenv.env['SUPABASE_ANON_KEY'])
+                  ?.trim()
+                  .isNotEmpty ==
+              true
+          ? (dotenv.env['SUPABASE_ANON'] ?? dotenv.env['SUPABASE_ANON_KEY'])
+          : defineSupabaseAnonKey)
+      ?.trim() ??
+      '';
 
   if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
+    AccountLifecycleService.registerSupabaseUrl(supabaseUrl);
     await Supabase.initialize(
       url: supabaseUrl,
-      anonKey: supabaseAnonKey,
+      publishableKey: supabaseAnonKey,
+      authOptions: FlutterAuthClientOptions(
+        authFlowType: AuthFlowType.pkce,
+        localStorage: SecureLocalStorage(
+          persistSessionKey: SecureLocalStorage.sessionKeyForUrl(supabaseUrl),
+        ),
+        pkceAsyncStorage: const SecureGotrueAsyncStorage(),
+        // Enforce app-level pending-transaction & PKCE checks before exchanging URIs.
+        detectSessionInUri: false,
+      ),
     );
   }
 
@@ -93,31 +128,68 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  void _handleIncomingUri(Uri uri) async {
-    if (uri.scheme != 'oruv') return;
+  void _showAuthLinkError(String message) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    });
+  }
 
-    // 1. If the deep link is for reset-password
-    if (uri.host == 'reset-password' || uri.path.contains('reset-password')) {
-      try {
-        await Supabase.instance.client.auth.getSessionFromUrl(uri);
-      } catch (_) {
-        // Ignored if session is already retrieved or PKCE handled
-      }
-      _navigateToResetPassword();
+  Future<void> _handleIncomingUri(Uri uri) async {
+    final auth = Supabase.instance.client.auth;
+    final validation = await AuthRedirectService.validateIncomingUri(
+      uri,
+      currentUserId: auth.currentUser?.id,
+    );
+
+    if (!validation.isValid) {
+      debugPrint('Rejected auth deep link: ${validation.rejectionReason}');
       return;
     }
 
-    // 2. If the deep link is for email confirmation (oruv://login-callback)
-    if (uri.host == 'login-callback' || uri.path.contains('login-callback')) {
+    if (validation.flow == AuthRedirectFlow.resetPassword) {
+      try {
+        await auth.getSessionFromUrl(uri);
+        await AuthRedirectService.clearPendingFlow(
+          AuthRedirectFlow.resetPassword,
+        );
+        if (auth.currentSession != null) {
+          _navigateToResetPassword();
+        } else {
+          _showAuthLinkError(
+            'Password reset link could not be verified. Please request a new one.',
+          );
+        }
+      } catch (e) {
+        debugPrint('Reset-password deep link exchange failed: $e');
+        _showAuthLinkError(
+          'Password reset link is invalid or expired. Please request a new one.',
+        );
+      }
+      return;
+    }
+
+    if (validation.flow == AuthRedirectFlow.loginCallback) {
       _pendingEmailConfirmation = true;
       try {
-        await Supabase.instance.client.auth.getSessionFromUrl(uri);
-      } catch (_) {
-        // Ignored if supabase_flutter already exchanged the PKCE code
-      }
-      if (Supabase.instance.client.auth.currentSession != null) {
+        await auth.getSessionFromUrl(uri);
+        await AuthRedirectService.clearPendingFlow(
+          AuthRedirectFlow.loginCallback,
+        );
+        if (auth.currentSession != null) {
+          _pendingEmailConfirmation = false;
+          _navigateToHomeAfterConfirm();
+        }
+      } catch (e) {
         _pendingEmailConfirmation = false;
-        _navigateToHomeAfterConfirm();
+        debugPrint('Login-callback deep link exchange failed: $e');
+        _showAuthLinkError(
+          'Sign-in verification link is invalid or expired. Please try again.',
+        );
       }
     }
   }
@@ -179,6 +251,7 @@ class _MyAppState extends State<MyApp> {
 
     return MaterialApp(
       navigatorKey: navigatorKey,
+      scaffoldMessengerKey: scaffoldMessengerKey,
       title: 'Oruv',
       debugShowCheckedModeBanner: false,
       home: homeScreen,

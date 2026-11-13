@@ -5,7 +5,7 @@ import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/components/settings/my_account_page.dart';
 import 'package:oruv/components/settings/settings_sheets.dart';
 import 'package:oruv/components/welcomePages/screenFour.dart';
-import 'package:oruv/services/google_auth_service.dart';
+import 'package:oruv/services/account_lifecycle_service.dart';
 import 'package:oruv/services/preferences_service.dart';
 import 'package:oruv/services/screen_time_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -288,10 +288,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
   Future<void> _performSignOut() async {
     setState(() => _isSigningOut = true);
     try {
-      await GoogleAuthService.signOut();
-      await Supabase.instance.client.auth.signOut();
-      await PreferencesService.setCompletedOnboarding(true);
-      OnboardingData.instance.reset();
+      await AccountLifecycleService.signOut();
     } catch (e) {
       debugPrint('Error signing out: $e');
     } finally {

@@ -116,7 +116,14 @@ class ShieldActionExtension: ShieldActionDelegate {
                 "total": total
             ]
             if let data = try? JSONSerialization.data(withJSONObject: payload, options: []) {
-                try? data.write(to: fileURL, options: .atomic)
+                let coordinator = NSFileCoordinator(filePresenter: nil)
+                coordinator.coordinate(writingItemAt: fileURL, options: .forReplacing, error: nil) { targetURL in
+                    try? data.write(to: targetURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                    var mutableURL = targetURL
+                    var values = URLResourceValues()
+                    values.isExcludedFromBackup = true
+                    try? mutableURL.setResourceValues(values)
+                }
             }
         }
 

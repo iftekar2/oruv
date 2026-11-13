@@ -9,9 +9,11 @@ import 'package:oruv/components/auth/components/googleSignUpButton.dart';
 import 'package:oruv/components/auth/emailSignIn.dart';
 import 'package:oruv/components/auth/emailSignUp.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/services/apple_auth_service.dart';
 import 'package:oruv/services/google_auth_service.dart';
+import 'package:oruv/services/preferences_service.dart';
 
 class ScreenFour extends StatefulWidget {
   const ScreenFour({super.key});
@@ -38,7 +40,11 @@ class _ScreenFourState extends State<ScreenFour> {
       });
 
       if (res != null && res.session != null) {
-        await OnboardingService.saveOnboardingData();
+        if (OnboardingData.instance.fullName.isNotEmpty) {
+          await OnboardingService.saveOnboardingData();
+        } else {
+          await PreferencesService.setCompletedOnboarding(true);
+        }
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
@@ -62,7 +68,11 @@ class _ScreenFourState extends State<ScreenFour> {
       });
 
       if (res != null && res.session != null) {
-        await OnboardingService.saveOnboardingData();
+        if (OnboardingData.instance.fullName.isNotEmpty) {
+          await OnboardingService.saveOnboardingData();
+        } else {
+          await PreferencesService.setCompletedOnboarding(true);
+        }
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,

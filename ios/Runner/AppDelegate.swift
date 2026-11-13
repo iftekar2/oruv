@@ -21,6 +21,7 @@ class ScreenTimeManager: ObservableObject {
   var methodChannel: FlutterMethodChannel?
   var isShieldActive: Bool = false
   private var hasAppliedInitialShieldState: Bool = false
+  private var isResettingState: Bool = false
   var resolvedTokenNamesCache: [String: String] = [:]
 
   @Published private(set) var orderedAppTokens: [ApplicationToken] = []
@@ -31,6 +32,10 @@ class ScreenTimeManager: ObservableObject {
   @Published var activitySelection = FamilyActivitySelection() {
     didSet {
       refreshOrderedTokens()
+      if isResettingState {
+        notifyFlutter()
+        return
+      }
       saveSelection()
       notifyFlutter()
       if isShieldActive {
@@ -128,6 +133,102 @@ class ScreenTimeManager: ObservableObject {
       // Monitoring already active or requires physical device
     }
     #endif
+  }
+
+  static func writeProtectedAppGroupData(_ data: Data, to url: URL) {
+    let coordinator = NSFileCoordinator(filePresenter: nil)
+    coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: nil) { targetURL in
+      try? data.write(to: targetURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+      var mutableURL = targetURL
+      var resourceValues = URLResourceValues()
+      resourceValues.isExcludedFromBackup = true
+      try? mutableURL.setResourceValues(resourceValues)
+    }
+  }
+
+  static func clearAppGroupTelemetryAndCache(includeMetrics: Bool = true) {
+    let sharedDefaults = UserDefaults(suiteName: appGroupId)
+    let telemetryKeys = [
+      "oruv_blocked_attempts_date",
+      "oruv_blocked_attempts_today",
+      "oruv_blocked_token_counts",
+      "oruv_blocked_token_names",
+      "oruv_most_blocked_token_key",
+      "oruv_most_blocked_app_name",
+      "oruv_most_blocked_app_count",
+      "oruv_total_blocked_today",
+      "oruv_last_open_timestamps",
+      "oruv_last_shielded_app_name",
+    ]
+    let metricsKeys = [
+      "oruv_daily_total_minutes",
+      "oruv_yesterday_total_minutes",
+      "oruv_time_saved_text",
+      "oruv_time_saved_label",
+      "oruv_is_saving_time",
+      "oruv_diff_minutes",
+      "oruv_daily_apps",
+      "oruv_insights_time_saved_text",
+      "oruv_insights_time_saved_label",
+      "oruv_insights_is_saving_time",
+      "oruv_insights_today_minutes",
+      "oruv_insights_yesterday_minutes",
+      "oruv_insights_diff_minutes",
+      "oruv_session_remaining",
+      "oruv_protected_today",
+      "oruv_screen_time_today",
+      "oruv_schedule_title",
+      "oruv_projected_time",
+      "oruv_projected_label",
+    ]
+    for key in telemetryKeys {
+      sharedDefaults?.removeObject(forKey: key)
+    }
+    if includeMetrics {
+      for key in metricsKeys {
+        sharedDefaults?.removeObject(forKey: key)
+      }
+    }
+
+    if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+      let filesToRemove = includeMetrics
+        ? ["blocked_attempts.json", "app_names.json", "screen_time_stats.json", "insights_metrics.json"]
+        : ["blocked_attempts.json", "app_names.json"]
+      let coordinator = NSFileCoordinator(filePresenter: nil)
+      for name in filesToRemove {
+        let fileURL = containerURL.appendingPathComponent(name)
+        coordinator.coordinate(writingItemAt: fileURL, options: .forDeleting, error: nil) { targetURL in
+          try? FileManager.default.removeItem(at: targetURL)
+        }
+      }
+    }
+    sharedDefaults?.synchronize()
+  }
+
+  func resetLocalState(clearSelection: Bool) {
+    clearShield(force: true)
+    hasAppliedInitialShieldState = false
+
+    #if canImport(DeviceActivity)
+    if isMonitoringStarted {
+      DeviceActivityCenter().stopMonitoring([DeviceActivityName("oruv.daily.activity")])
+      isMonitoringStarted = false
+    }
+    #endif
+
+    resolvedTokenNamesCache.removeAll()
+    mostBlockedAppToken = nil
+    mostBlockedCategoryToken = nil
+
+    if clearSelection {
+      isResettingState = true
+      activitySelection = FamilyActivitySelection()
+      isResettingState = false
+      UserDefaults.standard.removeObject(forKey: storageKey)
+      UserDefaults(suiteName: Self.appGroupId)?.removeObject(forKey: storageKey)
+    }
+
+    Self.clearAppGroupTelemetryAndCache(includeMetrics: true)
   }
 }
 
@@ -1459,7 +1560,7 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
                      var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     json["mostBlockedAppName"] = resolved
                     if let updated = try? JSONSerialization.data(withJSONObject: json, options: []) {
-                      try? updated.write(to: fileURL, options: .atomic)
+                      ScreenTimeManager.writeProtectedAppGroupData(updated, to: fileURL)
                     }
                   }
                 }
@@ -1478,25 +1579,15 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
               "hasNativeToken": hasNativeToken
             ])
           case "resetBlockedAttempts":
-            let sharedDefaults = UserDefaults(suiteName: ScreenTimeManager.appGroupId)
-            sharedDefaults?.removeObject(forKey: "oruv_blocked_attempts_today")
-            sharedDefaults?.removeObject(forKey: "oruv_blocked_token_counts")
-            sharedDefaults?.removeObject(forKey: "oruv_blocked_token_names")
-            sharedDefaults?.removeObject(forKey: "oruv_most_blocked_token_key")
-            sharedDefaults?.removeObject(forKey: "oruv_most_blocked_app_name")
-            sharedDefaults?.removeObject(forKey: "oruv_most_blocked_app_count")
-            sharedDefaults?.removeObject(forKey: "oruv_total_blocked_today")
-            sharedDefaults?.removeObject(forKey: "oruv_last_open_timestamps")
-            sharedDefaults?.removeObject(forKey: "oruv_last_shielded_app_name")
-            if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ScreenTimeManager.appGroupId) {
-              let fileURL = containerURL.appendingPathComponent("blocked_attempts.json")
-              try? FileManager.default.removeItem(at: fileURL)
-              let namesURL = containerURL.appendingPathComponent("app_names.json")
-              try? FileManager.default.removeItem(at: namesURL)
-            }
-            sharedDefaults?.synchronize()
+            ScreenTimeManager.clearAppGroupTelemetryAndCache(includeMetrics: false)
+            ScreenTimeManager.shared.resolvedTokenNamesCache.removeAll()
             ScreenTimeManager.shared.mostBlockedAppToken = nil
             ScreenTimeManager.shared.mostBlockedCategoryToken = nil
+            result(true)
+          case "resetLocalState":
+            let args = call.arguments as? [String: Any]
+            let clearSelection = (args?["clearSelection"] as? Bool) ?? true
+            ScreenTimeManager.shared.resetLocalState(clearSelection: clearSelection)
             result(true)
           case "getDailyScreenTime":
             let isApproved = AuthorizationCenter.shared.authorizationStatus == .approved
@@ -1661,7 +1752,7 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
                   metricsDict["projectedTimeText"] = projectedTimeText
                 }
                 if !metricsDict.isEmpty, let data = try? JSONSerialization.data(withJSONObject: metricsDict, options: []) {
-                  try? data.write(to: metricsURL, options: .atomic)
+                  ScreenTimeManager.writeProtectedAppGroupData(data, to: metricsURL)
                 }
               }
             }

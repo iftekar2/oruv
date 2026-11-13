@@ -343,7 +343,14 @@ nonisolated struct TotalActivityReport: DeviceActivityReportScene {
                 "diffMinutes": absDiffMinutes
             ]
             if let json = try? JSONSerialization.data(withJSONObject: statsDict, options: []) {
-                try? json.write(to: statsURL, options: .atomic)
+                let coordinator = NSFileCoordinator(filePresenter: nil)
+                coordinator.coordinate(writingItemAt: statsURL, options: .forReplacing, error: nil) { targetURL in
+                    try? json.write(to: targetURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                    var mutableURL = targetURL
+                    var values = URLResourceValues()
+                    values.isExcludedFromBackup = true
+                    try? mutableURL.setResourceValues(values)
+                }
             }
         }
 
@@ -729,7 +736,14 @@ nonisolated struct InsightsActivityReport: DeviceActivityReportScene {
                 "insightsYesterdayMinutes": effectiveYesterdayMinutes
             ]
             if let json = try? JSONSerialization.data(withJSONObject: statsDict, options: []) {
-                try? json.write(to: statsURL, options: .atomic)
+                let coordinator = NSFileCoordinator(filePresenter: nil)
+                coordinator.coordinate(writingItemAt: statsURL, options: .forReplacing, error: nil) { targetURL in
+                    try? json.write(to: targetURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                    var mutableURL = targetURL
+                    var values = URLResourceValues()
+                    values.isExcludedFromBackup = true
+                    try? mutableURL.setResourceValues(values)
+                }
             }
         }
 

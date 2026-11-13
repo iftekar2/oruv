@@ -11,6 +11,8 @@ class OnboardingService {
     final user = client.auth.currentUser;
     if (user == null) return;
 
+    OnboardingData.instance.reset();
+
     final meta = user.userMetadata;
     if (meta != null && meta.isNotEmpty) {
       OnboardingData.instance.loadFromMap(meta);
@@ -67,28 +69,18 @@ class OnboardingService {
 
   /// Deletes user data and calls the `delete_user_account` RPC in Supabase
   /// to remove the authenticated `auth.users` account.
+  /// Invokes the transactional RPC first so `ON DELETE CASCADE` removes all
+  /// dependent rows atomically without leaving an orphaned account behind.
   static Future<bool> deleteAccount() async {
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
     if (user == null) return false;
 
     try {
-      await client.from('focus_schedules').delete().eq('user_id', user.id);
-    } catch (e) {
-      debugPrint('Delete focus_schedules note: $e');
-    }
-
-    try {
-      await client.from('profiles').delete().eq('id', user.id);
-    } catch (e) {
-      debugPrint('Delete profiles note: $e');
-    }
-
-    try {
       await client.rpc('delete_user_account');
       return true;
     } catch (e) {
-      debugPrint('delete_user_account RPC note: $e');
+      debugPrint('delete_user_account RPC failed: $e');
       return false;
     }
   }

@@ -1,0 +1,6 @@
+# Copy to android/key.properties (already gitignored) and fill with release keystore values.
+storeFile=/path/to/oruv-upload-keystore.jks
+storePassword=CHANGE_ME
+keyAlias=upload
+keyPassword=CHANGE_ME
+

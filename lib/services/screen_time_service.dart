@@ -254,6 +254,26 @@ class ScreenTimeService {
     } catch (_) {}
   }
 
+  /// Clears native Screen Time shields, App Group metrics, and optionally saved
+  /// FamilyActivitySelection when signing out or deleting an account so native
+  /// enforcement and metrics never persist across accounts or while signed out.
+  static Future<void> resetLocalAccountState({
+    bool clearSelection = true,
+  }) async {
+    if (!Platform.isIOS) return;
+    try {
+      await _channel.invokeMethod('resetLocalState', {
+        'clearSelection': clearSelection,
+      });
+    } catch (e) {
+      debugPrint('ScreenTimeService.resetLocalAccountState note: $e');
+      try {
+        await _channel.invokeMethod('clearShield');
+        await _channel.invokeMethod('resetBlockedAttempts');
+      } catch (_) {}
+    }
+  }
+
   /// Requests Screen Time (iOS) or Usage Access (Android) permission.
   static Future<bool> requestAuthorization() async {
     if (!Platform.isIOS && !Platform.isAndroid) return false;

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -210,6 +211,15 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
     }
   }
 
+  String _generateUniqueRuleId() {
+    final random = Random.secure();
+    final suffix = List.generate(
+      8,
+      (_) => random.nextInt(16).toRadixString(16),
+    ).join();
+    return 'rule_${DateTime.now().millisecondsSinceEpoch}_$suffix';
+  }
+
   ScheduleRuleModel? get _conflictingRule {
     return ScheduleRuleModel.findConflictingSchedule(
       startTime: _startTime,
@@ -247,9 +257,7 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
         : _extraBlockedCount;
 
     final updatedRule = ScheduleRuleModel(
-      id:
-          widget.existingRule?.id ??
-          'rule_${DateTime.now().millisecondsSinceEpoch}',
+      id: widget.existingRule?.id ?? _generateUniqueRuleId(),
       title: title,
       startTime: _startTime,
       endTime: _endTime,

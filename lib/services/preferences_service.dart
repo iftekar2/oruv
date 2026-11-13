@@ -38,6 +38,23 @@ class PreferencesService {
     }
   }
 
+  /// Clears user-scoped settings when signing out or deleting an account so
+  /// device-local preferences do not carry over across accounts.
+  static Future<void> resetUserScopedPreferences({
+    bool clearOnboarding = false,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyMindfulBreakDefaultMinutes);
+      await prefs.remove(_keyNotificationsEnabled);
+      if (clearOnboarding) {
+        await prefs.remove(_keyHasCompletedOnboarding);
+      }
+    } catch (e) {
+      debugPrint('PreferencesService.resetUserScopedPreferences error: $e');
+    }
+  }
+
   /// Default mindful break duration in minutes (5, 10, or 15).
   static Future<int> getMindfulBreakDefaultMinutes() async {
     try {

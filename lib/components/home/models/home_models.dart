@@ -238,7 +238,7 @@ class ScheduleRuleModel {
       if (nowMins >= endMins) return endMins - startMins;
       return nowMins - startMins;
     } else {
-      // Overnight schedule (e.g. 8:00 PM - 7:00 AM)
+      // Overnight schedule (e.g. 8:00 PM - 6:00 AM)
       int total = 0;
       // Night portion (starts tonight at startMins):
       if (isScheduledForDay(now) && nowMins > startMins) {

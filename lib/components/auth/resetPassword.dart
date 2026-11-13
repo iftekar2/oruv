@@ -58,6 +58,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         UserAttributes(password: password),
       );
 
+      // Revoke active sessions and refresh tokens on all other devices after password change.
+      try {
+        await Supabase.instance.client.auth.signOut(
+          scope: SignOutScope.others,
+        );
+      } catch (e) {
+        debugPrint('Revoking other sessions after password update note: $e');
+      }
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(

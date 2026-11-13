@@ -9,6 +9,7 @@ import 'package:oruv/components/homeScreen.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/services/apple_auth_service.dart';
+import 'package:oruv/services/auth_redirect_service.dart';
 import 'package:oruv/services/google_auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -45,6 +46,8 @@ class _EmailSignUpState extends State<EmailSignUp> {
       });
 
       if (res != null && res.session != null) {
+        await OnboardingService.saveOnboardingData();
+        if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -67,6 +70,8 @@ class _EmailSignUpState extends State<EmailSignUp> {
       });
 
       if (res != null && res.session != null) {
+        await OnboardingService.saveOnboardingData();
+        if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -125,16 +130,23 @@ class _EmailSignUpState extends State<EmailSignUp> {
       final onboardingMap = OnboardingData.instance.toMap();
       onboardingMap['full_name'] = name;
 
+      await AuthRedirectService.markPendingFlow(
+        AuthRedirectFlow.loginCallback,
+      );
+
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
         data: onboardingMap,
-        emailRedirectTo: 'oruv://login-callback',
+        emailRedirectTo: AuthRedirectService.emailConfirmRedirectUrl,
       );
 
       if (!mounted) return;
 
       if (response.session != null) {
+        await AuthRedirectService.clearPendingFlow(
+          AuthRedirectFlow.loginCallback,
+        );
         await OnboardingService.saveOnboardingData();
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
@@ -158,11 +170,17 @@ class _EmailSignUpState extends State<EmailSignUp> {
         );
       }
     } on AuthException catch (e) {
+      await AuthRedirectService.clearPendingFlow(
+        AuthRedirectFlow.loginCallback,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
       );
     } catch (e) {
+      await AuthRedirectService.clearPendingFlow(
+        AuthRedirectFlow.loginCallback,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
