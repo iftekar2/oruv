@@ -12,6 +12,7 @@ import 'package:oruv/services/account_lifecycle_service.dart';
 import 'package:oruv/services/auth_redirect_service.dart';
 import 'package:oruv/services/preferences_service.dart';
 import 'package:oruv/services/secure_supabase_storage.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -64,6 +65,37 @@ Future<void> main() async {
     );
   }
 
+  // Initialize PostHog
+  const definePosthogApiKey = String.fromEnvironment('POSTHOG_API_KEY');
+  const definePosthogHost = String.fromEnvironment('POSTHOG_HOST');
+
+  final posthogApiKey =
+      (dotenv.env['POSTHOG_API_KEY']?.trim().isNotEmpty == true
+              ? dotenv.env['POSTHOG_API_KEY']
+              : definePosthogApiKey)
+          ?.trim() ??
+      '';
+
+  final posthogHost =
+      (dotenv.env['POSTHOG_HOST']?.trim().isNotEmpty == true
+              ? dotenv.env['POSTHOG_HOST']
+              : (definePosthogHost.isNotEmpty
+                  ? definePosthogHost
+                  : 'https://us.i.posthog.com'))
+          ?.trim() ??
+      'https://us.i.posthog.com';
+
+  if (posthogApiKey.isNotEmpty) {
+    try {
+      final config = PostHogConfig(posthogApiKey)
+        ..host = posthogHost
+        ..captureApplicationLifecycleEvents = true;
+      await Posthog().setup(config);
+    } catch (e) {
+      debugPrint('Note: PostHog setup failed: $e');
+    }
+  }
+
   bool hasCompletedOnboarding = false;
   try {
     hasCompletedOnboarding =
@@ -93,6 +125,17 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser != null) {
+        Posthog().identify(
+          userId: currentUser.id,
+          userProperties: {
+            if (currentUser.email != null) 'email': currentUser.email!,
+          },
+        );
+      }
+    } catch (_) {}
     _setupAuthListener();
     _setupDeepLinkHandling();
   }
@@ -197,6 +240,19 @@ class _MyAppState extends State<MyApp> {
   void _setupAuthListener() {
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final AuthChangeEvent event = data.event;
+      final session = data.session;
+
+      if (event == AuthChangeEvent.signedIn && session != null) {
+        Posthog().identify(
+          userId: session.user.id,
+          userProperties: {
+            if (session.user.email != null) 'email': session.user.email!,
+          },
+        );
+      } else if (event == AuthChangeEvent.signedOut) {
+        Posthog().reset();
+      }
+
       if (event == AuthChangeEvent.passwordRecovery) {
         _navigateToResetPassword();
       } else if (event == AuthChangeEvent.signedIn && _pendingEmailConfirmation) {
@@ -252,6 +308,9 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       navigatorKey: navigatorKey,
       scaffoldMessengerKey: scaffoldMessengerKey,
+      navigatorObservers: [
+        PosthogObserver(),
+      ],
       title: 'Oruv',
       debugShowCheckedModeBanner: false,
       home: homeScreen,

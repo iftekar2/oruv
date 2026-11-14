@@ -89,5 +89,8 @@
 			</array>
 		</dict>
 	</dict>
+
+	<key>com.posthog.posthog.AUTO_INIT</key>
+	<false/>
 </dict>
 </plist>
