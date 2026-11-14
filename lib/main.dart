@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:oruv/components/auth/resetPassword.dart';
@@ -69,31 +70,33 @@ Future<void> main() async {
   const definePosthogApiKey = String.fromEnvironment('POSTHOG_API_KEY');
   const definePosthogHost = String.fromEnvironment('POSTHOG_HOST');
 
-  final posthogApiKey =
-      (dotenv.env['POSTHOG_API_KEY']?.trim().isNotEmpty == true
-              ? dotenv.env['POSTHOG_API_KEY']
-              : definePosthogApiKey)
-          ?.trim() ??
-      '';
+  final rawPosthogKey = dotenv.env['POSTHOG_API_KEY'] ??
+      dotenv.env['POSTHOG_KEY'] ??
+      definePosthogApiKey;
+  final posthogApiKey = rawPosthogKey.trim();
 
-  final posthogHost =
-      (dotenv.env['POSTHOG_HOST']?.trim().isNotEmpty == true
-              ? dotenv.env['POSTHOG_HOST']
-              : (definePosthogHost.isNotEmpty
-                  ? definePosthogHost
-                  : 'https://us.i.posthog.com'))
-          ?.trim() ??
-      'https://us.i.posthog.com';
+  final rawPosthogHost = dotenv.env['POSTHOG_HOST'] ??
+      (definePosthogHost.isNotEmpty
+          ? definePosthogHost
+          : 'https://us.i.posthog.com');
+  final posthogHost = rawPosthogHost.trim();
 
   if (posthogApiKey.isNotEmpty) {
     try {
       final config = PostHogConfig(posthogApiKey)
         ..host = posthogHost
-        ..captureApplicationLifecycleEvents = true;
+        ..captureApplicationLifecycleEvents = true
+        ..debug = kDebugMode
+        ..flushAt = 1;
       await Posthog().setup(config);
+      debugPrint('PostHog successfully initialized with host: $posthogHost');
     } catch (e) {
       debugPrint('Note: PostHog setup failed: $e');
     }
+  } else {
+    debugPrint(
+      'Warning: PostHog API key is empty. Checked POSTHOG_API_KEY and POSTHOG_KEY in .env. Found keys: ${dotenv.env.keys.toList()}',
+    );
   }
 
   bool hasCompletedOnboarding = false;
