@@ -10,6 +10,7 @@ import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/components/onboarding/onboarding_service.dart';
 import 'package:oruv/services/apple_auth_service.dart';
 import 'package:oruv/services/auth_redirect_service.dart';
+import 'package:oruv/services/error_translator.dart';
 import 'package:oruv/services/google_auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -175,7 +176,10 @@ class _EmailSignUpState extends State<EmailSignUp> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
+        SnackBar(
+          content: Text(ErrorTranslator.translateAuthError(e)),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     } catch (e) {
       await AuthRedirectService.clearPendingFlow(
@@ -184,7 +188,7 @@ class _EmailSignUpState extends State<EmailSignUp> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("An unexpected error occured. Please try again."),
+          content: Text(ErrorTranslator.translateAuthError(e)),
           backgroundColor: Colors.redAccent,
         ),
       );

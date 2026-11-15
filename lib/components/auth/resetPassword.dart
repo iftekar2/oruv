@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/auth/components/authButton.dart';
 import 'package:oruv/components/auth/components/authTextField.dart';
 import 'package:oruv/components/homeScreen.dart';
+import 'package:oruv/services/error_translator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -84,13 +85,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     } on AuthException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
+        SnackBar(
+          content: Text(ErrorTranslator.translateAuthError(e)),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("An unexpected error occurred. Please try again."),
+        SnackBar(
+          content: Text(ErrorTranslator.translateAuthError(e)),
           backgroundColor: Colors.redAccent,
         ),
       );

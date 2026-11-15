@@ -6,6 +6,7 @@ import 'package:oruv/components/settings/settings_sheets.dart';
 import 'package:oruv/components/welcomePages/screenFour.dart';
 import 'package:oruv/services/account_lifecycle_service.dart';
 import 'package:oruv/services/auth_redirect_service.dart';
+import 'package:oruv/services/error_translator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MyAccountPage extends StatefulWidget {
@@ -218,12 +219,16 @@ class _MyAccountPageState extends State<MyAccountPage> {
                                     AuthRedirectService.resetPasswordRedirectUrl,
                               );
                           _showSnackBar('Password reset email sent to $email');
-                        } catch (_) {
+                        } catch (e) {
                           await AuthRedirectService.clearPendingFlow(
                             AuthRedirectFlow.resetPassword,
                           );
                           _showSnackBar(
-                            'Could not send password reset email',
+                            ErrorTranslator.translateAuthError(
+                              e,
+                              fallback:
+                                  'Could not send password reset email. Please try again.',
+                            ),
                             isError: true,
                           );
                         }

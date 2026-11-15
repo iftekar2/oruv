@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:oruv/services/auth_redirect_service.dart';
+import 'package:oruv/services/error_translator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class GoogleAuthService {
@@ -188,7 +189,7 @@ class GoogleAuthService {
       return null;
     } on AuthException catch (e) {
       debugPrint('Google Sign-In AuthException: ${e.message}');
-      _showSafeError(messenger, e.message);
+      _showSafeError(messenger, ErrorTranslator.translateAuthError(e));
       return null;
     } catch (e) {
       debugPrint('Google Sign-In Error: $e');

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
+import 'package:oruv/services/error_translator.dart';
 
 class AppShieldPage extends StatefulWidget {
   final VoidCallback? onChanged;
@@ -85,22 +86,22 @@ class AppShieldPageState extends State<AppShieldPage> {
       } else {
         setState(() {
           _isRequestingPermission = false;
-          _permissionError = errorMsg ??
-              "Screen Time access was not granted. Please tap Confirm on the system prompt.";
+          _permissionError = errorMsg != null
+              ? ErrorTranslator.translateScreenTimeError(errorMsg)
+              : "Screen Time access was not granted. Please tap Confirm on the system prompt.";
         });
       }
-    } on MissingPluginException {
+    } on MissingPluginException catch (e) {
       if (!mounted) return;
       setState(() {
         _isRequestingPermission = false;
-        _permissionError =
-            "Native Screen Time bridge requires a full rebuild (stop the app and run 'flutter run' again).";
+        _permissionError = ErrorTranslator.translateScreenTimeError(e);
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isRequestingPermission = false;
-        _permissionError = e.toString();
+        _permissionError = ErrorTranslator.translateScreenTimeError(e);
       });
     }
   }

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/auth/components/authButton.dart';
 import 'package:oruv/components/auth/components/authTextField.dart';
 import 'package:oruv/services/auth_redirect_service.dart';
+import 'package:oruv/services/error_translator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -73,7 +74,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.message),
+          content: Text(ErrorTranslator.translateAuthError(e)),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -83,8 +84,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("An unexpected error occurred. Please try again."),
+        SnackBar(
+          content: Text(ErrorTranslator.translateAuthError(e)),
           backgroundColor: Colors.redAccent,
         ),
       );

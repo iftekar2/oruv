@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:oruv/services/error_translator.dart';
 
 class AppleAuthService {
   /// Generates a random nonce for Apple Sign-in to prevent replay attacks
@@ -60,7 +60,7 @@ class AppleAuthService {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Apple Sign-In failed: ${e.message}'),
+            content: Text(ErrorTranslator.translateAppleSignInError(e)),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -71,7 +71,7 @@ class AppleAuthService {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Apple Sign-In failed: $e'),
+            content: Text(ErrorTranslator.translateAppleSignInError(e)),
             backgroundColor: Colors.red.shade700,
           ),
         );
