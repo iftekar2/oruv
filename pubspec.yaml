@@ -46,6 +46,7 @@ dependencies:
   shared_preferences: ^2.5.3
   flutter_secure_storage: ^10.3.4
   posthog_flutter: ^5.60.3
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

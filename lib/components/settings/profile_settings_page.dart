@@ -9,6 +9,7 @@ import 'package:oruv/services/account_lifecycle_service.dart';
 import 'package:oruv/services/preferences_service.dart';
 import 'package:oruv/services/screen_time_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileSettingsPage extends StatefulWidget {
   const ProfileSettingsPage({super.key});
@@ -225,6 +226,32 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         'Enable Screen Time access in system settings to continue',
         isError: true,
       );
+    }
+  }
+
+  static final Uri _supportUri =
+      Uri.parse('https://oruvsupportwebsite.netlify.app/');
+
+  Future<void> _openSupportWebsite() async {
+    try {
+      final launched = await launchUrl(
+        _supportUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        _showSnackBar(
+          'Could not open support website.',
+          isError: true,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error launching support website: $e');
+      if (mounted) {
+        _showSnackBar(
+          'Could not open support website.',
+          isError: true,
+        );
+      }
     }
   }
 
@@ -463,6 +490,23 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                         : SettingsPalette.mutedText,
                     onTap: _handleScreenTimeAccess,
                     showChevron: !_screenTimeAuthorized,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // Support & Feedback Section
+              const _SectionLabel(title: 'Support & Feedback'),
+              const SizedBox(height: 10),
+              SettingsGroupedCard(
+                children: [
+                  SettingsTile(
+                    icon: Icons.support_agent_rounded,
+                    title: 'Report an Issue',
+                    subtitle: 'Encountered a bug or need help? Submit an issue to our support team',
+                    onTap: _openSupportWebsite,
+                    showChevron: true,
                   ),
                 ],
               ),
