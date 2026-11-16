@@ -8,6 +8,7 @@ import 'package:oruv/services/account_lifecycle_service.dart';
 import 'package:oruv/services/auth_redirect_service.dart';
 import 'package:oruv/services/google_auth_service.dart';
 import 'package:oruv/services/preferences_service.dart';
+import 'package:oruv/services/schedule_service.dart';
 import 'package:oruv/services/secure_supabase_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -256,6 +257,20 @@ void main() {
       final map = rule.toSupabaseMap('user-abc');
       expect(map['id'], equals('work_time'));
       expect(map['user_id'], equals('user-abc'));
+    });
+  });
+
+  group('Default focus schedules', () {
+    test('Default schedules have Work Time, Evening Wind Down, and Morning Clarity all active', () async {
+      final rules = await ScheduleService.loadSchedules();
+      expect(rules.length, equals(3));
+      final workTime = rules.firstWhere((r) => r.id == 'work_time');
+      final eveningWindDown = rules.firstWhere((r) => r.id == 'evening_wind_down');
+      final morningClarity = rules.firstWhere((r) => r.id == 'morning_clarity');
+
+      expect(workTime.isActive, isTrue);
+      expect(eveningWindDown.isActive, isTrue);
+      expect(morningClarity.isActive, isTrue);
     });
   });
 
