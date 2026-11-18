@@ -2,15 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oruv/components/home/adjust_anchor_sheet.dart';
-import 'package:oruv/components/home/daily_screen_time_card.dart';
-import 'package:oruv/components/home/deep_work_anchor_card.dart';
 import 'package:oruv/components/home/home_bottom_nav_bar.dart';
+import 'package:oruv/components/home/home_dashboard_view.dart';
 import 'package:oruv/components/home/home_top_app_bar.dart';
 import 'package:oruv/components/home/insights_page.dart';
 import 'package:oruv/components/home/mindful_break_sheet.dart';
 import 'package:oruv/components/home/models/home_models.dart';
 import 'package:oruv/components/home/rule_editor_sheet.dart';
-import 'package:oruv/components/home/rules_schedules_section.dart';
 import 'package:oruv/components/home/shields_page.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/components/onboarding/onboarding_service.dart';
@@ -628,79 +626,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildHomeDashboard(LiveAnchorSnapshot snapshot) {
-    return SingleChildScrollView(
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Feature 1: Live Deep Work Anchor Card
-          RepaintBoundary(
-            child: DeepWorkAnchorCard(
-              shieldLabel: snapshot.shieldLabel,
-              title: snapshot.title,
-              isAuthorized: _screenTimeSnapshot?.isAuthorized ?? false,
-              scheduleStart: snapshot.scheduleStart,
-              scheduleEnd: snapshot.scheduleEnd,
-              remainingCycleText: snapshot.remainingCycleText,
-              progress: snapshot.progress,
-              sessionRemaining: snapshot.activeRule != null
-                  ? ScheduleRuleModel.formatDurationMinutes(
-                      snapshot.activeRule!.currentCycleRemainingMinutes,
-                    )
-                  : '0m',
-              protectedToday: snapshot.projectedTimeText,
-              isSavingTime: snapshot.isSavingTime,
-              projectedTimeText: snapshot.projectedTimeText,
-              projectedLabel: snapshot.projectedLabel,
-              mostBlockedAppName: _mostBlockedAppName,
-              mostBlockedAppCount: _mostBlockedAppCount,
-              hasMostBlockedNativeToken: _hasMostBlockedNativeToken,
-              screenTimeToday:
-                  (_screenTimeSnapshot?.totalMinutes != null &&
-                      _screenTimeSnapshot!.totalMinutes! > 0)
-                  ? ScheduleRuleModel.formatDurationMinutes(
-                      _screenTimeSnapshot!.totalMinutes!,
-                    )
-                  : '0m',
-              focusedDuration: snapshot.focusedDuration,
-              focusScore: snapshot.focusScore,
-              isOnBreak: _isOnMindfulBreak,
-              breakRemainingSeconds: _mindfulBreakRemainingSeconds,
-              breakTotalSeconds: _mindfulBreakTotalSeconds,
-              onTakeMindfulBreak: _handleTakeMindfulBreak,
-              onAdjust: () => _handleAdjustAnchor(snapshot),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Feature 2: Daily Screen Time Card (Middle of screen, above Rules & Schedules)
-          DailyScreenTimeCard(
-            isAuthorized: _screenTimeSnapshot?.isAuthorized ?? false,
-            useNativeIosReport:
-                _screenTimeSnapshot?.useNativeIosReport ?? false,
-            totalMinutes: _screenTimeSnapshot?.totalMinutes,
-            apps: _topFiveApps,
-            onConnect: _handleConnectScreenTime,
-            onTap: _handleSelectInsightsTab,
-            onTapHeader: _handleSelectInsightsTab,
-          ),
-
-          const SizedBox(height: 26),
-
-          // Feature 3: Rules & Schedules Section (Horizontal Row in Escalator Order)
-          RepaintBoundary(
-            child: RulesSchedulesSection(
-              rules: ScheduleService.sortRulesForHomeEscalator(_rules),
-              onRuleToggled: _handleRuleToggled,
-              onRuleTap: _openEditRuleSheet,
-              onViewAll: _handleViewAllRules,
-              isGrid: false,
-            ),
-          ),
-        ],
-      ),
+    return HomeDashboardView(
+      snapshot: snapshot,
+      screenTimeSnapshot: _screenTimeSnapshot,
+      topFiveApps: _topFiveApps,
+      mostBlockedAppName: _mostBlockedAppName,
+      mostBlockedAppCount: _mostBlockedAppCount,
+      hasMostBlockedNativeToken: _hasMostBlockedNativeToken,
+      isOnMindfulBreak: _isOnMindfulBreak,
+      mindfulBreakRemainingSeconds: _mindfulBreakRemainingSeconds,
+      mindfulBreakTotalSeconds: _mindfulBreakTotalSeconds,
+      rules: _rules,
+      onTakeMindfulBreak: _handleTakeMindfulBreak,
+      onAdjustAnchor: () => _handleAdjustAnchor(snapshot),
+      onConnectScreenTime: _handleConnectScreenTime,
+      onSelectInsightsTab: _handleSelectInsightsTab,
+      onRuleToggled: _handleRuleToggled,
+      onRuleTap: _openEditRuleSheet,
+      onViewAllRules: _handleViewAllRules,
     );
   }
 }

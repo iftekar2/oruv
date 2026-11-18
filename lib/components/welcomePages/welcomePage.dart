@@ -6,6 +6,10 @@ import 'package:oruv/components/onboarding/focus_priorities_page.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/components/onboarding/time_analysis_page.dart';
 import 'package:oruv/components/onboarding/user_profile_page.dart';
+import 'package:oruv/components/welcomePages/components/app_shield_status_row.dart';
+import 'package:oruv/components/welcomePages/components/hold_to_commit_button.dart';
+import 'package:oruv/components/welcomePages/components/time_reclaimed_sheet_body.dart';
+import 'package:oruv/components/welcomePages/components/welcome_card_body.dart';
 import 'package:oruv/components/welcomePages/screenFour.dart';
 import 'package:oruv/components/welcomePages/screenOne.dart';
 import 'package:oruv/components/welcomePages/screenThree.dart';
@@ -360,7 +364,10 @@ class _WelcomePageState extends State<WelcomePage>
 
                       // Stationary Primary Button (or Hold to Commit on final step)
                       if (_currentPage == 7)
-                        _buildHoldToCommitButton()
+                        HoldToCommitButton(
+                          holdController: _holdController,
+                          buttonBgColor: _buttonBgColor,
+                        )
                       else
                         SizedBox(
                           width: double.infinity,
@@ -433,12 +440,12 @@ class _WelcomePageState extends State<WelcomePage>
 
     switch (page) {
       case 0:
-        return _buildWelcomeCardBody(
-          key: const ValueKey('welcome_0'),
+        return const WelcomeCardBody(
+          key: ValueKey('welcome_0'),
           title: "BLOCK DISTRACTIONS",
           subtitle:
               "Lock Instagram, TikTok and any app that\npulls you away \u2014 no willpower needed.",
-          metricsChild: _buildTwoColumnMetrics(
+          metricsChild: TwoColumnMetrics(
             leftVal: "2h+",
             leftLabel: "Saved daily",
             rightVal: "50+",
@@ -446,12 +453,12 @@ class _WelcomePageState extends State<WelcomePage>
           ),
         );
       case 1:
-        return _buildWelcomeCardBody(
-          key: const ValueKey('welcome_1'),
+        return const WelcomeCardBody(
+          key: ValueKey('welcome_1'),
           title: "SET YOUR SCHEDULE",
           subtitle:
               "Block social media at 10 PM and get it back\nat 8 AM. It runs on its own, every day.",
-          metricsChild: _buildTwoColumnMetrics(
+          metricsChild: TwoColumnMetrics(
             leftVal: "10 PM",
             leftLabel: "Apps lock",
             rightVal: "8 AM",
@@ -459,474 +466,20 @@ class _WelcomePageState extends State<WelcomePage>
           ),
         );
       case 2:
-        return _buildWelcomeCardBody(
-          key: const ValueKey('welcome_2'),
+        return const WelcomeCardBody(
+          key: ValueKey('welcome_2'),
           title: "FOCUS ANYWHERE",
           subtitle:
               "Create focus modes for work, school or\ncollege and win back hours of attention.",
-          metricsChild: _buildCommunityMetric(),
+          metricsChild: CommunityMetric(),
         );
       case 5:
-        return _buildTimeReclaimedSheetBody();
+        return const TimeReclaimedSheetBody();
       case 6:
-        return _buildAppShieldStatusRow();
+        return const AppShieldStatusRow();
       default:
         return const SizedBox.shrink(key: ValueKey('compact_sheet'));
     }
   }
 
-  Widget _buildWelcomeCardBody({
-    required Key key,
-    required String title,
-    required String subtitle,
-    required Widget metricsChild,
-  }) {
-    return Column(
-      key: key,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 20),
-        ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 38),
-          child: Center(
-            child: Text(
-              title,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              style: GoogleFonts.outfit(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
-                color: const Color(0xFF1E1A1D),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
-          child: Center(
-            child: Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 14.5,
-                height: 1.45,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF8A8287),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 56),
-          child: Center(child: metricsChild),
-        ),
-        const SizedBox(height: 8),
-      ],
-    );
-  }
-
-  Widget _buildTwoColumnMetrics({
-    required String leftVal,
-    required String leftLabel,
-    required String rightVal,
-    required String rightLabel,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  leftVal,
-                  style: GoogleFonts.outfit(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1E1A1D),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  leftLabel,
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF8A8287),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(height: 38, width: 1, color: const Color(0xFFE5DFD9)),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  rightVal,
-                  style: GoogleFonts.outfit(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1E1A1D),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  rightLabel,
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF8A8287),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCommunityMetric() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SizedBox(
-          width: 68,
-          height: 28,
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF8C6D73),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _cardBgColor, width: 2),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 18,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF077C6A),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _cardBgColor, width: 2),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 36,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1BE41),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _cardBgColor, width: 2),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "12K+",
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF1E1A1D),
-              ),
-            ),
-            Text(
-              "Focused people",
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF8A8287),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimeReclaimedSheetBody() {
-    final screenTime = OnboardingData.instance.dailyScreenTime;
-    String reclaimedDaily = "2h 30m";
-    int daysGivenBack = 38;
-
-    if (screenTime == '< 2 hours') {
-      reclaimedDaily = "1h 15m";
-      daysGivenBack = 19;
-    } else if (screenTime == '5 - 6 hours') {
-      reclaimedDaily = "3h 45m";
-      daysGivenBack = 57;
-    } else if (screenTime == '7+ hours') {
-      reclaimedDaily = "5h 00m";
-      daysGivenBack = 76;
-    }
-
-    return Column(
-      key: const ValueKey('time_reclaimed_sheet'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 18),
-        Text(
-          "TIME RECLAIMED",
-          style: GoogleFonts.outfit(
-            fontSize: 26,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.5,
-            color: const Color(0xFF1E1A1D),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          "Honest projections when friction is placed between\nimpulse and action.",
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 13.5,
-            height: 1.4,
-            color: const Color(0xFF8A8287),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFEBE5DF)),
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          reclaimedDaily,
-                          style: GoogleFonts.outfit(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF1E1A1D),
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          "Reclaimed daily",
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: const Color(0xFF8A8287),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    height: 36,
-                    width: 1,
-                    color: const Color(0xFFE5DFD9),
-                  ),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          "$daysGivenBack Days",
-                          style: GoogleFonts.outfit(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF1E1A1D),
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          "Given back / yr",
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: const Color(0xFF8A8287),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Divider(color: Color(0xFFEBE5DF), thickness: 0.8),
-              const SizedBox(height: 8),
-              Text(
-                "94%",
-                style: GoogleFonts.outfit(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: const Color(0xFF077C6A),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                "Report less fog",
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF8A8287),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-      ],
-    );
-  }
-
-  Widget _buildAppShieldStatusRow() {
-    if (!OnboardingData.instance.screenTimeAuthorized) {
-      return const SizedBox.shrink(key: ValueKey('app_shield_perm'));
-    }
-
-    final appCount = OnboardingData.instance.totalSelectedAppsCount;
-
-    return Padding(
-      key: const ValueKey('app_shield_status'),
-      padding: const EdgeInsets.only(top: 14.0, left: 4.0, right: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: appCount > 0
-                  ? const Color(0xFF077C6A)
-                  : const Color(0xFFB5AFB3),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            "$appCount ${appCount == 1 ? 'App' : 'Apps'} Selected",
-            style: GoogleFonts.inter(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1E1A1D),
-            ),
-          ),
-          if (appCount > 0) ...[
-            const Spacer(),
-            Text(
-              "~3.5h saved daily",
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF8A8287),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHoldToCommitButton() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTapDown: (_) {
-            if (_holdController.status == AnimationStatus.completed) {
-              _holdController.reset();
-            }
-            _holdController.forward();
-          },
-          onTapUp: (_) {
-            if (_holdController.status != AnimationStatus.completed) {
-              _holdController.reverse();
-            }
-          },
-          onTapCancel: () {
-            if (_holdController.status != AnimationStatus.completed) {
-              _holdController.reverse();
-            }
-          },
-          child: AnimatedBuilder(
-            animation: _holdController,
-            builder: (context, child) {
-              return Container(
-                width: double.infinity,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: _buttonBgColor,
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Stack(
-                  alignment: Alignment.centerLeft,
-                  children: [
-                    FractionallySizedBox(
-                      widthFactor: _holdController.value,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF077C6A),
-                          borderRadius: BorderRadius.circular(28),
-                        ),
-                      ),
-                    ),
-                    Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.lock_outline_rounded,
-                            size: 19,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _holdController.value > 0
-                                ? "Holding..."
-                                : "Hold to Commit",
-                            style: GoogleFonts.outfit(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          "Customize details later in settings",
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            color: const Color(0xFF8A8287),
-          ),
-        ),
-      ],
-    );
-  }
 }

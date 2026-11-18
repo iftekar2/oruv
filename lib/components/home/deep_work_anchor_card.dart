@@ -1,9 +1,7 @@
-import 'dart:io';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:oruv/components/home/deep_work_anchor/anchor_metrics_row.dart';
+import 'package:oruv/components/home/deep_work_anchor/anchor_progress_ring_painter.dart';
 
 class DeepWorkAnchorCard extends StatelessWidget {
   final String shieldLabel;
@@ -58,7 +56,6 @@ class DeepWorkAnchorCard extends StatelessWidget {
   });
 
   static const Color _accentGreen = Color(0xFF1D6F58);
-  static const Color _coralRed = Color(0xFFD94841);
   static const Color _primaryText = Color(0xFF1B1B1D);
   static const Color _mutedText = Color(0xFF6E6A6E);
   static const Color _cardBorder = Color(0xFFECE8E4);
@@ -149,7 +146,7 @@ class DeepWorkAnchorCard extends StatelessWidget {
                 width: 62,
                 height: 62,
                 child: CustomPaint(
-                  painter: _AnchorProgressRingPainter(
+                  painter: AnchorProgressRingPainter(
                     progress: progress,
                     activeColor: _accentGreen,
                     trackColor: const Color(0xFFE8E4DF),
@@ -213,170 +210,17 @@ class DeepWorkAnchorCard extends StatelessWidget {
           const SizedBox(height: 18),
 
           // 3-Column Metrics Row: Session Remaining, Projected Time Saved, Urges Blocked
-          Row(
-            crossAxisAlignment: CrossAxisAlignment
-                .start, // Perfectly aligns all columns at the top
-            children: [
-              // Column 1: Session Remaining
-              Expanded(
-                child: _buildMetricColumn(
-                  value: sessionRemaining ?? '0m',
-                  label: 'Session Remaining',
-                  valueColor: _primaryText,
-                ),
-              ),
-
-              Container(width: 1, height: 45, color: const Color(0xFFEEEAE6)),
-
-              // Column 2: Projected / On Track to Save
-              Expanded(
-                child: (Platform.isIOS && isAuthorized)
-                    ? const SizedBox(
-                        height: 52,
-                        child: IgnorePointer(
-                          child: RepaintBoundary(
-                            child: UiKitView(
-                              viewType: 'oruv/anchor_time_saved',
-                              creationParamsCodec: StandardMessageCodec(),
-                              hitTestBehavior:
-                                  PlatformViewHitTestBehavior.transparent,
-                            ),
-                          ),
-                        ),
-                      )
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            height:
-                                32, // Fixed height container to match top value line heights
-                            child: Center(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    isSavingTime
-                                        ? Icons.arrow_drop_down_sharp
-                                        : Icons.arrow_drop_up_sharp,
-                                    size: 25,
-                                    color: isSavingTime
-                                        ? _accentGreen
-                                        : _coralRed,
-                                  ),
-                                  Flexible(
-                                    child: Text(
-                                      projectedTimeText ??
-                                          (protectedToday ?? focusedDuration),
-                                      style: GoogleFonts.lora(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        color: isSavingTime
-                                            ? _accentGreen
-                                            : _coralRed,
-                                        letterSpacing: -0.2,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            projectedLabel ??
-                                (isSavingTime
-                                    ? 'On Track to Save'
-                                    : 'Over Yest.'),
-                            style: GoogleFonts.lora(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: _mutedText,
-                              height: 1.2,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-              ),
-
-              Container(width: 1, height: 45, color: const Color(0xFFEEEAE6)),
-
-              // Column 3: Urges / Most Blocked App
-              Expanded(
-                child: _buildMetricColumn(
-                  value: mostBlockedAppCount > 0
-                      ? '${mostBlockedAppCount}X'
-                      : '0',
-                  label: 'Urges Blocked',
-                  valueColor: _primaryText,
-                  customLabelWidget: mostBlockedAppCount > 0
-                      ? (mostBlockedAppName.isNotEmpty
-                            ? Text.rich(
-                                TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: mostBlockedAppName,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: _primaryText,
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: ' Blocked',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: _primaryText,
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              )
-                            : (hasMostBlockedNativeToken && Platform.isIOS
-                                  ? const Text.rich(
-                                      TextSpan(
-                                        children: [
-                                          TextSpan(
-                                            text: 'Apps',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                              color: _primaryText,
-                                              height: 1.2,
-                                            ),
-                                          ),
-                                          TextSpan(
-                                            text: ' Blocked',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: _primaryText,
-                                              height: 1.2,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      textAlign: TextAlign.center,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    )
-                                  : null))
-                      : null,
-                ),
-              ),
-            ],
+          AnchorMetricsRow(
+            sessionRemaining: sessionRemaining,
+            isAuthorized: isAuthorized,
+            isSavingTime: isSavingTime,
+            projectedTimeText: projectedTimeText,
+            projectedLabel: projectedLabel,
+            protectedToday: protectedToday,
+            focusedDuration: focusedDuration,
+            mostBlockedAppCount: mostBlockedAppCount,
+            mostBlockedAppName: mostBlockedAppName,
+            hasMostBlockedNativeToken: hasMostBlockedNativeToken,
           ),
 
           const SizedBox(height: 22),
@@ -457,169 +301,5 @@ class DeepWorkAnchorCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Widget _buildMetricColumn({
-    required String value,
-    required String label,
-    required Color valueColor,
-    Widget? prefixIcon,
-    Widget? customLabelWidget,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Fixed height container ensures the top values align perfectly across all columns
-        SizedBox(
-          height: 32,
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                if (prefixIcon != null) ...[
-                  prefixIcon,
-                  const SizedBox(width: 2),
-                ],
-                Flexible(
-                  child: Text(
-                    value,
-                    style: GoogleFonts.lora(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: valueColor,
-                      letterSpacing: -0.2,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        if (customLabelWidget != null)
-          customLabelWidget
-        else
-          Text(
-            label,
-            // Updated to match the exact font styling, size, and weight of "On Track to Save"
-            style: GoogleFonts.lora(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: _mutedText,
-              height: 1.2,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-      ],
-    );
-  }
-}
-
-//  Widget _buildMetricColumn({
-//     required String value,
-//     required String label,
-//     required Color valueColor,
-//     Widget? prefixIcon,
-//     Widget? customLabelWidget,
-//   }) {
-//     return Column(
-//       mainAxisSize: MainAxisSize.min,
-//       children: [
-//         Row(
-//           mainAxisSize: MainAxisSize.min,
-//           mainAxisAlignment: MainAxisAlignment.center,
-//           crossAxisAlignment: CrossAxisAlignment.center,
-//           children: [
-//             if (prefixIcon != null) ...[prefixIcon, const SizedBox(width: 2)],
-//             Flexible(
-//               child: Text(
-//                 value,
-//                 style: GoogleFonts.lora(
-//                   fontSize: 20,
-//                   fontWeight: FontWeight.w700,
-//                   color: valueColor,
-//                   letterSpacing: -0.2,
-//                 ),
-//                 maxLines: 1,
-//                 overflow: TextOverflow.ellipsis,
-//               ),
-//             ),
-//           ],
-//         ),
-//         const SizedBox(height: 5),
-//         if (customLabelWidget != null)
-//           customLabelWidget
-//         else
-//           Text(
-//             label,
-//             style: GoogleFonts.lora(
-//               fontSize: 11,
-//               fontWeight: FontWeight.w400,
-//               color: _mutedText,
-//               height: 1.2,
-//             ),
-//             textAlign: TextAlign.center,
-//             maxLines: 2,
-//             overflow: TextOverflow.ellipsis,
-//           ),
-//       ],
-//     );
-//   }
-// }
-
-class _AnchorProgressRingPainter extends CustomPainter {
-  final double progress;
-  final Color activeColor;
-  final Color trackColor;
-
-  _AnchorProgressRingPainter({
-    required this.progress,
-    required this.activeColor,
-    required this.trackColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const strokeWidth = 5.2;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (math.min(size.width, size.height) - strokeWidth) / 2;
-
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-
-    canvas.drawCircle(center, radius, trackPaint);
-
-    final activePaint = Paint()
-      ..color = activeColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    // Starts at bottom-left (~7:30 position) and sweeps clockwise, matching design
-    const startAngle = math.pi * 0.72;
-    final sweepAngle = 2 * math.pi * progress.clamp(0.0, 1.0);
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepAngle,
-      false,
-      activePaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _AnchorProgressRingPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.activeColor != activeColor ||
-        oldDelegate.trackColor != trackColor;
   }
 }

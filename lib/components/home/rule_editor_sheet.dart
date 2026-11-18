@@ -4,6 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:oruv/components/home/models/home_models.dart';
+import 'package:oruv/components/home/rule_editor/rule_editor_apps_selector.dart';
+import 'package:oruv/components/home/rule_editor/rule_editor_conflict_banner.dart';
+import 'package:oruv/components/home/rule_editor/rule_editor_days_selector.dart';
+import 'package:oruv/components/home/rule_editor/rule_editor_mode_selector.dart';
+import 'package:oruv/components/home/rule_editor/rule_editor_time_picker.dart';
+import 'package:oruv/components/home/rule_editor/rule_editor_title_section.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 
 class RuleEditorSheet extends StatefulWidget {
@@ -50,10 +56,8 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
     'Weekend Detox',
   ];
 
-  static const Color _accentGreen = Color(0xFF1D6F58);
   static const Color _primaryText = Color(0xFF1B1B1D);
   static const Color _mutedText = Color(0xFF6E6A6E);
-  static const Color _cardBorder = Color(0xFFECE8E4);
 
   @override
   void initState() {
@@ -357,573 +361,105 @@ class _RuleEditorSheetState extends State<RuleEditorSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1. Prominent Choose from All iPhone Apps & Categories Card
-                      Text(
-                        'SHIELDED APPS',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                          color: _mutedText,
-                        ),
-                      ),
-
-                      const SizedBox(height: 8),
-                      GestureDetector(
+                      // 1. Choose from All iPhone Apps & Categories
+                      RuleEditorAppsSelector(
+                        extraBlockedCount: _extraBlockedCount,
+                        isPickerOpen: _isPickerOpen,
                         onTap: _openNativeScreenTimePicker,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          clipBehavior: Clip.hardEdge,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: _cardBorder),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.03),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF3EFEA),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                      Icons.apps_rounded,
-                                      size: 22,
-                                      color: _primaryText,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Choose from All iPhone Apps & Categories',
-                                          style: GoogleFonts.lora(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                            height: 1.25,
-                                            color: _primaryText,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          _extraBlockedCount > 0
-                                              ? 'Tap to add or remove blocked apps'
-                                              : 'Tap to select apps & websites to block',
-                                          style: GoogleFonts.lora(
-                                            fontSize: 12,
-                                            color: _mutedText,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 22,
-                                    color: _mutedText,
-                                  ),
-                                ],
-                              ),
-                              if (_extraBlockedCount > 0) ...[
-                                const SizedBox(height: 14),
-                                const Divider(
-                                  color: Color(0xFFF2EEEA),
-                                  height: 1,
-                                  thickness: 1,
-                                ),
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  height: 28,
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 7,
-                                        height: 7,
-                                        decoration: const BoxDecoration(
-                                          color: _accentGreen,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          '$_extraBlockedCount ${_extraBlockedCount == 1 ? 'App' : 'Apps'} chosen to block',
-                                          style: GoogleFonts.lora(
-                                            fontSize: 13,
-                                            height: 1.1,
-                                            fontWeight: FontWeight.w600,
-                                            color: _primaryText,
-                                          ),
-                                        ),
-                                      ),
-                                      if (Platform.isIOS && !_isPickerOpen)
-                                        ClipRect(
-                                          child: SizedBox(
-                                            width: 110,
-                                            height: 28,
-                                            child: IgnorePointer(
-                                              child: UiKitView(
-                                                key: ValueKey<int>(
-                                                  _extraBlockedCount,
-                                                ),
-                                                viewType:
-                                                    'oruv/selected_apps_icons',
-                                                creationParamsCodec:
-                                                    const StandardMessageCodec(),
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                      else if (Platform.isIOS)
-                                        const SizedBox(width: 110, height: 28),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
                       ),
 
-                    const SizedBox(height: 22),
+                      const SizedBox(height: 22),
 
-                    // 2. Schedule Name Input + Quick Presets
-                    Text(
-                      'SCHEDULE NAME',
-                      style: GoogleFonts.inter(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: _mutedText,
+                      // 2. Schedule Name Input + Quick Presets
+                      RuleEditorTitleSection(
+                        controller: _titleController,
+                        presetNames: _presetNames,
+                        onPresetSelected: (preset) {
+                          setState(() {
+                            _titleController.text = preset;
+                          });
+                        },
                       ),
-                    ),
 
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _titleController,
-                      style: GoogleFonts.lora(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w600,
-                        color: _primaryText,
+                      const SizedBox(height: 20),
+
+                      // 3. Time Block (Start & End Time)
+                      RuleEditorTimePicker(
+                        startTime: _startTime,
+                        endTime: _endTime,
+                        onPickTime: _pickTime,
                       ),
-                      decoration: InputDecoration(
-                        hintText: 'e.g. Work Time, Study Block',
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: _cardBorder),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: _cardBorder),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: _accentGreen,
-                            width: 1.5,
-                          ),
-                        ),
+
+                      const SizedBox(height: 20),
+
+                      // 4. Active Days
+                      RuleEditorDaysSelector(
+                        dayKeys: _dayKeys,
+                        dayLabels: _dayLabels,
+                        activeDays: _activeDays,
+                        onDayToggled: (key) {
+                          setState(() {
+                            if (_activeDays.contains(key) &&
+                                _activeDays.length > 1) {
+                              _activeDays.remove(key);
+                            } else {
+                              _activeDays.add(key);
+                            }
+                          });
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: _presetNames.map((preset) {
-                          final isMatch = _titleController.text == preset;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _titleController.text = preset;
-                                });
-                              },
 
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isMatch
-                                      ? const Color(0xFFE6F5F0)
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: isMatch ? _accentGreen : _cardBorder,
-                                  ),
-                                ),
+                      const SizedBox(height: 20),
 
-                                child: Text(
-                                  preset,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: isMatch ? _accentGreen : _mutedText,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                      // 5. Enforcement Mode
+                      RuleEditorModeSelector(
+                        options: _enforcementOptions,
+                        selectedMode: _enforcementMode,
+                        onModeSelected: (mode) {
+                          setState(() => _enforcementMode = mode);
+                        },
                       ),
-                    ),
 
-                    const SizedBox(height: 20),
-
-                    // 3. Time Block (Start & End Time)
-                    Text(
-                      'TIME BLOCK',
-                      style: GoogleFonts.inter(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: _mutedText,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => _pickTime(isStart: true),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: _cardBorder),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'STARTS',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: _mutedText,
-                                        ),
-                                      ),
-                                      const Icon(
-                                        Icons.access_time_rounded,
-                                        size: 15,
-                                        color: _accentGreen,
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _startTime,
-                                    style: GoogleFonts.lora(
-                                      fontSize: 16.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: _primaryText,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => _pickTime(isStart: false),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: _cardBorder),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'UNLOCKS',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: _mutedText,
-                                        ),
-                                      ),
-                                      const Icon(
-                                        Icons.access_time_rounded,
-                                        size: 15,
-                                        color: _accentGreen,
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _endTime,
-                                    style: GoogleFonts.lora(
-                                      fontSize: 16.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: _primaryText,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
+                      if (hasConflict) ...[
+                        const SizedBox(height: 16),
+                        RuleEditorConflictBanner(conflict: conflict),
                       ],
-                    ),
 
-                    const SizedBox(height: 20),
-
-                    // 4. Active Days
-                    Text(
-                      'ACTIVE DAYS',
-                      style: GoogleFonts.inter(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: _mutedText,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(_dayKeys.length, (idx) {
-                        final key = _dayKeys[idx];
-                        final label = _dayLabels[idx];
-                        final isSelected = _activeDays.contains(key);
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              if (isSelected && _activeDays.length > 1) {
-                                _activeDays.remove(key);
-                              } else {
-                                _activeDays.add(key);
-                              }
-                            });
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isSelected
-                                  ? const Color(0xFF131B26)
-                                  : Colors.white,
-                              border: Border.all(
-                                color: isSelected
-                                    ? const Color(0xFF131B26)
-                                    : _cardBorder,
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              label,
-                              style: GoogleFonts.inter(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: isSelected ? Colors.white : _mutedText,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // 5. Enforcement Mode
-                    Text(
-                      'ENFORCEMENT MODE',
-                      style: GoogleFonts.inter(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: _mutedText,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Column(
-                      children: _enforcementOptions.map((mode) {
-                        final isSelected = _enforcementMode == mode;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _enforcementMode = mode),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? _accentGreen
-                                      : _cardBorder,
-                                  width: isSelected ? 1.5 : 1.0,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    isSelected
-                                        ? Icons.radio_button_checked_rounded
-                                        : Icons.radio_button_off_rounded,
-                                    size: 18,
-                                    color: isSelected
-                                        ? _accentGreen
-                                        : _mutedText,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      mode,
-                                      style: GoogleFonts.lora(
-                                        fontSize: 13.5,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w700
-                                            : FontWeight.w500,
-                                        color: _primaryText,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
-                    if (hasConflict) ...[
                       const SizedBox(height: 16),
-                      Container(
+
+                      // Save Button
+                      SizedBox(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFDF3E7),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: const Color(0xFFE89A58).withOpacity(0.5),
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: hasConflict ? null : _handleSave,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF131B26),
+                            disabledBackgroundColor: const Color(0xFFD6D1CB),
+                            foregroundColor: Colors.white,
+                            disabledForegroundColor: const Color(0xFF8A8580),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.only(top: 2),
-                              child: Icon(
-                                Icons.warning_amber_rounded,
-                                size: 20,
-                                color: Color(0xFFC06A28),
-                              ),
+                          child: Text(
+                            hasConflict
+                                ? 'Time Slot Overlaps'
+                                : (isEditing
+                                      ? 'Save Changes'
+                                      : 'Create Schedule'),
+                            style: GoogleFonts.lora(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Schedule Conflict',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF8A4612),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    'This time overlaps with "${conflict!.title}" (${conflict.timeRange}). Please pick another time or adjust active days.',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      height: 1.35,
-                                      fontWeight: FontWeight.w500,
-                                      color: const Color(0xFF8A4612)
-                                          .withOpacity(0.9),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
-
-                    const SizedBox(height: 16),
-
-                    // Save Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: hasConflict ? null : _handleSave,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF131B26),
-                          disabledBackgroundColor: const Color(0xFFD6D1CB),
-                          foregroundColor: Colors.white,
-                          disabledForegroundColor: const Color(0xFF8A8580),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                        ),
-                        child: Text(
-                          hasConflict
-                              ? 'Time Slot Overlaps'
-                              : (isEditing ? 'Save Changes' : 'Create Schedule'),
-                          style: GoogleFonts.lora(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
             ),
           ],
         ),

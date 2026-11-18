@@ -3,8 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:oruv/components/home/daily_screen_time_card.dart';
+import 'package:oruv/components/home/insights/insights_app_breakdown.dart';
+import 'package:oruv/components/home/insights/insights_authorization_card.dart';
+import 'package:oruv/components/home/insights/insights_header.dart';
+import 'package:oruv/components/home/insights/insights_metrics_card.dart';
+import 'package:oruv/components/home/insights/insights_weekly_chart.dart';
 import 'package:oruv/components/onboarding/onboarding_data.dart';
 import 'package:oruv/services/screen_time_service.dart';
 
@@ -28,15 +31,8 @@ class _InsightsPageState extends State<InsightsPage> {
   String _selectedGranularity = 'D'; // 'D', 'W'
 
   static const Color _primaryText = Color(0xFF1B1B1D);
-  static const Color _mutedText = Color(0xFF6E6A6E);
-  static const Color _cardBorder = Color(0xFFEFEBE8);
-  static const Color _cardBg = Colors.white;
   static const Color _emeraldGreen = Color(0xFF16654E);
   static const Color _redBarColor = Color(0xFFE53935);
-  static const Color _mintBarColor = Color(0xFF74C69D);
-  static const Color _greyBarColor = Color(0xFF7E7777);
-  static const Color _trackColor = Color(0xFFF3EBE9);
-  static const Color _dividerColor = Color(0xFFF4EFEA);
 
   List<AppScreenTimeItem> _getDistractingApps(List<AppScreenTimeItem> allApps) {
     return allApps
@@ -166,21 +162,27 @@ class _InsightsPageState extends State<InsightsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isAuthorized) ...[
-            _buildAuthorizationPrompt(),
+            InsightsAuthorizationCard(
+              onConnect: widget.onConnectScreenTime,
+            ),
             const SizedBox(height: 22),
           ],
 
           // ─── 1. TOP HERO: Screen Time / Daily Average + Switcher ─────
-          _buildHeroHeader(
-            isWeek ? weekDailyAvgMins : totalMins,
+          InsightsHeroHeader(
+            displayMinutes: isWeek ? weekDailyAvgMins : totalMins,
             isWeek: isWeek,
+            selectedGranularity: _selectedGranularity,
+            onGranularityChanged: (granularity) {
+              setState(() => _selectedGranularity = granularity);
+            },
           ),
 
           const SizedBox(height: 22),
 
           // ─── 2. WEEKLY BAR GRAPH (Week mode only) ────────────────────
           if (isWeek) ...[
-            _buildWeeklyBarChartCard(
+            InsightsWeeklyChartCard(
               weekDayMinutes: weekDayMinutes,
               todayIndex: todayIndex,
               dailyAvgMinutes: weekDailyAvgMins,
@@ -190,7 +192,7 @@ class _InsightsPageState extends State<InsightsPage> {
           ],
 
           // ─── 3. 3-COLUMN METRICS SUMMARY CARD ────────────────────────
-          _buildMetricsSummaryCard(
+          InsightsMetricsCard(
             distractedPercentage: '$pctDistracted%',
             timeSavedDuration: timeSavedText,
             timeSavedLabel: timeSavedLabel,
@@ -203,12 +205,12 @@ class _InsightsPageState extends State<InsightsPage> {
           const SizedBox(height: 26),
 
           // ─── 4. DISTRACTING APPS SECTION ─────────────────────────────
-          _buildSectionHeader(
+          InsightsSectionHeader(
             title: 'Distracting Apps',
             durationText: AppScreenTimeItem.formatMinutes(distractingMins),
           ),
           const SizedBox(height: 10),
-          _buildAppCard(
+          InsightsAppCard(
             apps: distractingApps,
             maxAppMinutes: maxAppMins,
             defaultBarColor: _redBarColor,
@@ -220,12 +222,12 @@ class _InsightsPageState extends State<InsightsPage> {
           const SizedBox(height: 50),
 
           // ─── 5. OTHER APPS SECTION ───────────────────────────────────
-          _buildSectionHeader(
+          InsightsSectionHeader(
             title: 'Other Apps',
             durationText: AppScreenTimeItem.formatMinutes(otherMins),
           ),
           const SizedBox(height: 10),
-          _buildAppCard(
+          InsightsAppCard(
             apps: otherApps,
             maxAppMinutes: maxAppMins,
             defaultBarColor: _emeraldGreen,
@@ -237,739 +239,5 @@ class _InsightsPageState extends State<InsightsPage> {
         ],
       ),
     );
-  }
-
-  // ─── HERO HEADER ─────────────────────────────────────────────────────────
-
-  Widget _buildHeroHeader(int displayMinutes, {required bool isWeek}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isWeek ? 'Daily Average' : 'Screen Time',
-              style: GoogleFonts.lora(
-                fontSize: 14,
-                color: _mutedText,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              AppScreenTimeItem.formatMinutes(displayMinutes),
-              style: GoogleFonts.lora(
-                fontSize: 44,
-                fontWeight: FontWeight.w800,
-                color: _primaryText,
-                letterSpacing: -1.0,
-                height: 1.05,
-              ),
-            ),
-          ],
-        ),
-
-        // Granularity Switcher: ( D )  W
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: _buildGranularityPill(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGranularityPill() {
-    return Container(
-      padding: const EdgeInsets.all(4.5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F6F4),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFEFE9E5), width: 1.2),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: ['D', 'W'].map((granularity) {
-          final isSelected = _selectedGranularity == granularity;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              setState(() => _selectedGranularity = granularity);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 34),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 7.5,
-              ),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? const Color(0xFF262326)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                granularity,
-                style: GoogleFonts.lora(
-                  fontSize: 14.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? Colors.white : const Color(0xFF4A4A4A),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  // ─── WEEKLY BAR CHART CARD ───────────────────────────────────────────────
-
-  Widget _buildWeeklyBarChartCard({
-    required List<int> weekDayMinutes,
-    required int todayIndex,
-    required int dailyAvgMinutes,
-    required int weekTotalMinutes,
-  }) {
-    const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    final maxDay = weekDayMinutes.fold<int>(0, (a, b) => math.max(a, b));
-    final peak = math.max(maxDay, dailyAvgMinutes);
-    final rawHours = math.max(2, (peak / 60.0).ceil());
-    final ceilingHours = rawHours.isEven ? rawHours : rawHours + 1;
-    final chartMaxMinutes = math.max(120, ceilingHours * 60);
-    const chartHeight = 132.0;
-    const axisWidth = 34.0;
-    const cardFill = Color(0xFFFDFBF9);
-    const avgLineColor = Color(0xFF22A06B);
-
-    final avgRatio = (dailyAvgMinutes / chartMaxMinutes).clamp(0.0, 1.0);
-    final avgY = chartHeight * (1.0 - avgRatio);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
-      decoration: BoxDecoration(
-        color: cardFill,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF0EAE6), width: 1.2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: chartHeight,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final plotWidth = math.max(1.0, constraints.maxWidth - axisWidth);
-                final colWidth = plotWidth / 7.0;
-
-                return Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      width: plotWidth,
-                      height: chartHeight,
-                      child: CustomPaint(
-                        painter: _WeeklyChartGridPainter(
-                          gridColor: const Color(0xFFECE5E1),
-                          avgY: avgY,
-                          showAvgLine: dailyAvgMinutes > 0,
-                          avgLineColor: avgLineColor,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      width: plotWidth,
-                      height: chartHeight,
-                      child: Row(
-                        children: List.generate(7, (idx) {
-                          final isFuture = idx > todayIndex;
-                          final mins = weekDayMinutes[idx];
-                          final ratio = (mins / chartMaxMinutes).clamp(0.0, 1.0);
-                          final barH = (!isFuture && mins > 0)
-                              ? math.max(5.0, chartHeight * ratio)
-                              : 0.0;
-
-                          return SizedBox(
-                            width: colWidth,
-                            height: chartHeight,
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: barH > 0
-                                  ? Container(
-                                      width: math.min(
-                                        20.0,
-                                        math.max(12.0, colWidth * 0.48),
-                                      ),
-                                      height: barH,
-                                      decoration: const BoxDecoration(
-                                        color: _emeraldGreen,
-                                        borderRadius: BorderRadius.vertical(
-                                          top: Radius.circular(5),
-                                        ),
-                                      ),
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      width: axisWidth,
-                      height: chartHeight,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Positioned(
-                            top: 0,
-                            child: Text(
-                              '${ceilingHours}h',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: _mutedText,
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: chartHeight * 0.5 - 6,
-                            child: Text(
-                              '${ceilingHours ~/ 2}h',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: _mutedText,
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            child: Text(
-                              '0',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: _mutedText,
-                              ),
-                            ),
-                          ),
-                          if (dailyAvgMinutes > 0)
-                            Positioned(
-                              top: (avgY - 7).clamp(4.0, chartHeight - 16.0),
-                              child: Container(
-                                color: cardFill,
-                                padding: const EdgeInsets.symmetric(horizontal: 2),
-                                child: Text(
-                                  'avg',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: avgLineColor,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: List.generate(7, (idx) {
-                    final isToday = idx == todayIndex;
-                    final isFuture = idx > todayIndex;
-                    return Expanded(
-                      child: Center(
-                        child: Text(
-                          dayLabels[idx],
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight:
-                                isToday ? FontWeight.w700 : FontWeight.w500,
-                            color: isToday
-                                ? _primaryText
-                                : (isFuture
-                                      ? _mutedText.withValues(alpha: 0.5)
-                                      : _mutedText),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-              ),
-              const SizedBox(width: axisWidth),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(color: Color(0xFFEFE8E5), height: 1, thickness: 1),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Total Screen Time',
-                style: GoogleFonts.lora(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w500,
-                  color: _mutedText,
-                ),
-              ),
-              Text(
-                AppScreenTimeItem.formatMinutes(weekTotalMinutes),
-                style: GoogleFonts.lora(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: _primaryText,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── 3-COLUMN METRICS SUMMARY CARD ───────────────────────────────────────
-
-  Widget _buildMetricsSummaryCard({
-    required String distractedPercentage,
-    required String timeSavedDuration,
-    required String timeSavedLabel,
-    required bool isSavingTime,
-    required String rightValue,
-    required String rightLabel,
-    required Color rightColor,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFDFBF9),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF0EAE6), width: 1.2),
-      ),
-      child: Row(
-        children: [
-          // Column 1: Distracted
-          Expanded(
-            child: _buildMetricColumn(
-              value: distractedPercentage,
-              label: 'Distracted',
-              valueColor: _primaryText,
-            ),
-          ),
-          Container(width: 1, height: 28, color: const Color(0xFFEFE8E5)),
-          // Column 2: TIME SAVED / DAILY GOAL
-          Expanded(
-            child: _buildMetricColumn(
-              value: timeSavedDuration,
-              label: timeSavedLabel,
-              valueColor: isSavingTime ? _emeraldGreen : _redBarColor,
-            ),
-          ),
-          Container(width: 1, height: 28, color: const Color(0xFFEFE8E5)),
-          // Column 3: PICKUPS/HR or LAST WEEK
-          Expanded(
-            child: _buildMetricColumn(
-              value: rightValue,
-              label: rightLabel,
-              valueColor: rightColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricColumn({
-    required String value,
-    required String label,
-    required Color valueColor,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              maxLines: 1,
-              style: GoogleFonts.lora(
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-                color: valueColor,
-                height: 1.1,
-              ),
-            ),
-          ),
-          const SizedBox(height: 5),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              maxLines: 1,
-              style: GoogleFonts.inter(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.4,
-                color: _mutedText,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── SECTION HEADER ──────────────────────────────────────────────────────
-
-  Widget _buildSectionHeader({
-    required String title,
-    required String durationText,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.lora(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: _primaryText,
-          ),
-        ),
-        Text(
-          durationText,
-          style: GoogleFonts.lora(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: _primaryText,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ─── SECTION CARD ────────────────────────────────────────────────────────
-
-  Widget _buildAppCard({
-    required List<AppScreenTimeItem> apps,
-    required int maxAppMinutes,
-    required Color defaultBarColor,
-    required String emptyMessage,
-    bool isOtherSection = false,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-      decoration: const BoxDecoration(color: Colors.transparent),
-      child: apps.isEmpty
-          ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                emptyMessage,
-                style: GoogleFonts.lora(fontSize: 13, color: _mutedText),
-              ),
-            )
-          : ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: apps.length,
-              separatorBuilder: (_, __) =>
-                  const Divider(color: _dividerColor, height: 22, thickness: 1),
-              itemBuilder: (context, index) {
-                final item = apps[index];
-                final ratio = (item.durationMinutes / maxAppMinutes).clamp(
-                  0.06,
-                  1.0,
-                );
-
-                final isOruv = item.name.toLowerCase().contains('oruv');
-                final isBrowser =
-                    item.name.toLowerCase().contains('safari') ||
-                    item.name.toLowerCase().contains('chrome');
-
-                Color barColor = defaultBarColor;
-                if (isOtherSection) {
-                  if (isOruv) {
-                    barColor = _emeraldGreen;
-                  } else if (isBrowser) {
-                    barColor = _mintBarColor;
-                  } else {
-                    barColor = _greyBarColor;
-                  }
-                }
-
-                return _buildAppItem(
-                  icon: _buildAppIcon(item),
-                  title: item.name,
-                  subtitle: isOruv ? 'Deep Work' : null,
-                  durationText: item.formattedDuration,
-                  progressRatio: ratio,
-                  barColor: barColor,
-                );
-              },
-            ),
-    );
-  }
-
-  Widget _buildAppItem({
-    required Widget icon,
-    required String title,
-    String? subtitle,
-    required String durationText,
-    required double progressRatio,
-    required Color barColor,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(width: 38, height: 38, child: icon),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.lora(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: _primaryText,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                        color: _emeraldGreen,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              durationText,
-              style: GoogleFonts.lora(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: _primaryText,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Container(
-          height: 7,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: _trackColor,
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: progressRatio,
-            child: Container(
-              decoration: BoxDecoration(
-                color: barColor,
-                borderRadius: BorderRadius.circular(5),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ─── APP ICONS ───────────────────────────────────────────────────────────
-
-  Widget _buildAppIcon(AppScreenTimeItem item) {
-    if (item.iconBytes != null && item.iconBytes!.isNotEmpty) {
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFECE8E4), width: 0.8),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(9),
-          child: Image.memory(
-            item.iconBytes!,
-            fit: BoxFit.cover,
-            cacheWidth: 114,
-            cacheHeight: 114,
-            gaplessPlayback: true,
-            errorBuilder: (_, __, ___) => _buildMonogramIcon(item.name),
-          ),
-        ),
-      );
-    }
-    return _buildMonogramIcon(item.name);
-  }
-
-  Widget _buildMonogramIcon(String name) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFEEEBE7),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        name.isNotEmpty ? name[0].toUpperCase() : '?',
-        style: GoogleFonts.lora(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: _primaryText,
-        ),
-      ),
-    );
-  }
-
-  // ─── AUTHORIZATION PROMPT ────────────────────────────────────────────────
-
-  Widget _buildAuthorizationPrompt() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Connect Screen Time',
-            style: GoogleFonts.lora(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: _primaryText,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Authorize Screen Time to see accurate per-app breakdown on this device.',
-            style: GoogleFonts.inter(
-              fontSize: 12.5,
-              color: _mutedText,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: widget.onConnectScreenTime,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: _emeraldGreen,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                'Connect Now',
-                style: GoogleFonts.inter(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WeeklyChartGridPainter extends CustomPainter {
-  final Color gridColor;
-  final double avgY;
-  final bool showAvgLine;
-  final Color avgLineColor;
-
-  _WeeklyChartGridPainter({
-    required this.gridColor,
-    required this.avgY,
-    required this.showAvgLine,
-    required this.avgLineColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = gridColor
-      ..strokeWidth = 0.8;
-
-    for (final factor in [0.0, 0.5, 1.0]) {
-      final y = size.height * factor;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    final dividerPaint = Paint()
-      ..color = gridColor.withValues(alpha: 0.65)
-      ..strokeWidth = 0.7;
-    final colWidth = size.width / 7.0;
-    for (int i = 0; i <= 7; i++) {
-      final x = colWidth * i;
-      double y = 0;
-      while (y < size.height) {
-        final endY = math.min(y + 2, size.height);
-        canvas.drawLine(Offset(x, y), Offset(x, endY), dividerPaint);
-        y += 4;
-      }
-    }
-
-    if (showAvgLine) {
-      final avgPaint = Paint()
-        ..color = avgLineColor
-        ..strokeWidth = 1.5;
-      double x = 0;
-      while (x < size.width) {
-        final endX = math.min(x + 3, size.width);
-        canvas.drawLine(Offset(x, avgY), Offset(endX, avgY), avgPaint);
-        x += 6;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _WeeklyChartGridPainter oldDelegate) {
-    return oldDelegate.avgY != avgY ||
-        oldDelegate.showAvgLine != showAvgLine ||
-        oldDelegate.gridColor != gridColor ||
-        oldDelegate.avgLineColor != avgLineColor;
   }
 }

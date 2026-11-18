@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oruv/components/home/daily_screen_time_card.dart';
 
+export 'package:oruv/components/home/daily_screen_time_card.dart'
+    show AppScreenTimeItem;
+
 class DailyScreenTimeSnapshot {
   /// Whether the user granted Screen Time (iOS) / Usage Access (Android).
   final bool isAuthorized;
