@@ -12,6 +12,80 @@ import DeviceActivity
 #endif
 
 #if canImport(FamilyControls)
+public struct StoredSchedule: Codable {
+  public let id: String
+  public let title: String
+  public let startHour: Int
+  public let startMinute: Int
+  public let endHour: Int
+  public let endMinute: Int
+  public let activeDays: [String]
+  public let isActive: Bool
+
+  public init(
+    id: String,
+    title: String,
+    startHour: Int,
+    startMinute: Int,
+    endHour: Int,
+    endMinute: Int,
+    activeDays: [String],
+    isActive: Bool
+  ) {
+    self.id = id
+    self.title = title
+    self.startHour = startHour
+    self.startMinute = startMinute
+    self.endHour = endHour
+    self.endMinute = endMinute
+    self.activeDays = activeDays
+    self.isActive = isActive
+  }
+
+  public func isScheduled(forWeekday weekday: Int) -> Bool {
+    if activeDays.isEmpty { return true }
+    let key: String
+    switch weekday {
+    case 1: key = "S2" // Sunday
+    case 2: key = "M"  // Monday
+    case 3: key = "T"  // Tuesday
+    case 4: key = "W"  // Wednesday
+    case 5: key = "T2" // Thursday
+    case 6: key = "F"  // Friday
+    case 7: key = "S"  // Saturday
+    default: key = "M"
+    }
+    return activeDays.contains(key)
+  }
+
+  public func isCurrentlyRunning(at date: Date = Date(), calendar: Calendar = .current) -> Bool {
+    guard isActive else { return false }
+
+    let weekday = calendar.component(.weekday, from: date)
+    let hour = calendar.component(.hour, from: date)
+    let minute = calendar.component(.minute, from: date)
+    let nowMins = hour * 60 + minute
+
+    let startMins = startHour * 60 + startMinute
+    let endMins = endHour * 60 + endMinute
+
+    if startMins <= endMins {
+      guard isScheduled(forWeekday: weekday) else { return false }
+      return nowMins >= startMins && nowMins < endMins
+    } else {
+      // Overnight schedule (e.g. 10:00 PM to 7:00 AM)
+      if nowMins >= startMins {
+        return isScheduled(forWeekday: weekday)
+      }
+      if nowMins < endMins {
+        let yesterdayWeekday = weekday == 1 ? 7 : weekday - 1
+        return isScheduled(forWeekday: yesterdayWeekday) || isScheduled(forWeekday: weekday)
+      }
+      return false
+    }
+  }
+}
+
 @available(iOS 16.0, *)
 class ScreenTimeManager: ObservableObject {
   static let shared = ScreenTimeManager()
@@ -24,6 +98,7 @@ class ScreenTimeManager: ObservableObject {
   private var hasAppliedInitialShieldState: Bool = false
   private var isResettingState: Bool = false
   var resolvedTokenNamesCache: [String: String] = [:]
+  private(set) var storedSchedules: [StoredSchedule] = []
 
   private var breakTimer: Timer?
   private var breakBgTaskId: UIBackgroundTaskIdentifier = .invalid
@@ -47,6 +122,7 @@ class ScreenTimeManager: ObservableObject {
         applyShield(force: true)
       }
       startDailyDeviceActivityMonitoring()
+      syncScheduleMonitors()
     }
   }
 
@@ -55,6 +131,17 @@ class ScreenTimeManager: ObservableObject {
        let decoded = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: data) {
       self.activitySelection = decoded
       refreshOrderedTokens()
+      saveSelection()
+    } else if let groupData = UserDefaults(suiteName: Self.appGroupId)?.data(forKey: storageKey),
+              let decoded = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: groupData) {
+      self.activitySelection = decoded
+      refreshOrderedTokens()
+      saveSelection()
+    }
+    if let schedulesData = UserDefaults(suiteName: Self.appGroupId)?.data(forKey: "oruv_stored_schedules"),
+       let decoded = try? JSONDecoder().decode([StoredSchedule].self, from: schedulesData) {
+      self.storedSchedules = decoded
+      syncScheduleMonitors(with: decoded)
     }
   }
 
@@ -244,6 +331,90 @@ class ScreenTimeManager: ObservableObject {
     #endif
   }
 
+  func updateSchedules(from rawList: [[String: Any]]?) {
+    guard let rawList = rawList else { return }
+    var parsed: [StoredSchedule] = []
+    for dict in rawList {
+      let id = (dict["id"] as? String) ?? ""
+      guard !id.isEmpty else { continue }
+      let title = (dict["title"] as? String) ?? "Focus"
+      let startHour = (dict["startHour"] as? NSNumber)?.intValue ?? (dict["startHour"] as? Int) ?? 0
+      let startMinute = (dict["startMinute"] as? NSNumber)?.intValue ?? (dict["startMinute"] as? Int) ?? 0
+      let endHour = (dict["endHour"] as? NSNumber)?.intValue ?? (dict["endHour"] as? Int) ?? 0
+      let endMinute = (dict["endMinute"] as? NSNumber)?.intValue ?? (dict["endMinute"] as? Int) ?? 0
+      let activeDays = (dict["activeDays"] as? [String]) ?? []
+      let isActive = (dict["isActive"] as? Bool) ?? true
+
+      parsed.append(StoredSchedule(
+        id: id,
+        title: title,
+        startHour: startHour,
+        startMinute: startMinute,
+        endHour: endHour,
+        endMinute: endMinute,
+        activeDays: activeDays,
+        isActive: isActive
+      ))
+    }
+    self.storedSchedules = parsed
+    if let encoded = try? JSONEncoder().encode(parsed) {
+      UserDefaults(suiteName: Self.appGroupId)?.set(encoded, forKey: "oruv_stored_schedules")
+    }
+    syncScheduleMonitors(with: parsed)
+  }
+
+  func syncScheduleMonitors(with schedules: [StoredSchedule]? = nil) {
+    #if canImport(DeviceActivity)
+    guard AuthorizationCenter.shared.authorizationStatus == .approved else { return }
+    let list = schedules ?? storedSchedules
+    let center = DeviceActivityCenter()
+
+    let activeSchedules = list.filter {
+      $0.isActive && ($0.startHour != $0.endHour || $0.startMinute != $0.endMinute)
+    }
+    let desiredActivityNames = Set(activeSchedules.map { DeviceActivityName("oruv.schedule.\($0.id)") })
+
+    let monitoredActivities = center.activities.filter { $0.rawValue.starts(with: "oruv.schedule.") }
+    for monitored in monitoredActivities {
+      if !desiredActivityNames.contains(monitored) {
+        center.stopMonitoring([monitored])
+      }
+    }
+
+    for s in activeSchedules {
+      let activityName = DeviceActivityName("oruv.schedule.\(s.id)")
+      let schedule = DeviceActivitySchedule(
+        intervalStart: DateComponents(hour: s.startHour, minute: s.startMinute, second: 0),
+        intervalEnd: DateComponents(hour: s.endHour, minute: s.endMinute, second: 0),
+        repeats: true
+      )
+      // Stop any existing monitor with this name before starting it to prevent alreadyMonitoring error
+      center.stopMonitoring([activityName])
+      do {
+        try center.startMonitoring(activityName, during: schedule)
+        NSLog("[ScreenTimeManager] Successfully registered monitor for %@ (%02d:%02d - %02d:%02d)", s.id, s.startHour, s.startMinute, s.endHour, s.endMinute)
+      } catch {
+        NSLog("[ScreenTimeManager] Failed to monitor schedule %@: %@", s.id, error.localizedDescription)
+      }
+    }
+    #endif
+  }
+
+  func evaluateCurrentShieldState() {
+    checkMindfulBreakExpiry()
+    let isBreakActive = mindfulBreakEndTime != nil && Date() < mindfulBreakEndTime!
+    if isBreakActive {
+      clearShield()
+      return
+    }
+    let shouldBlock = storedSchedules.contains { $0.isCurrentlyRunning() }
+    if shouldBlock {
+      applyShield()
+    } else {
+      clearShield()
+    }
+  }
+
   static func writeProtectedAppGroupData(_ data: Data, to url: URL) {
     let coordinator = NSFileCoordinator(filePresenter: nil)
     coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: nil) { targetURL in
@@ -320,8 +491,13 @@ class ScreenTimeManager: ObservableObject {
     hasAppliedInitialShieldState = false
 
     #if canImport(DeviceActivity)
+    let center = DeviceActivityCenter()
+    let scheduleActivities = center.activities.filter { $0.rawValue.starts(with: "oruv.schedule.") }
+    if !scheduleActivities.isEmpty {
+      center.stopMonitoring(scheduleActivities)
+    }
     if isMonitoringStarted {
-      DeviceActivityCenter().stopMonitoring([DeviceActivityName("oruv.daily.activity")])
+      center.stopMonitoring([DeviceActivityName("oruv.daily.activity")])
       isMonitoringStarted = false
     }
     #endif
@@ -331,6 +507,8 @@ class ScreenTimeManager: ObservableObject {
     mostBlockedCategoryToken = nil
 
     if clearSelection {
+      storedSchedules.removeAll()
+      UserDefaults(suiteName: Self.appGroupId)?.removeObject(forKey: "oruv_stored_schedules")
       isResettingState = true
       activitySelection = FamilyActivitySelection()
       isResettingState = false
@@ -1459,6 +1637,7 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
     #if canImport(FamilyControls)
     if #available(iOS 16.0, *) {
       ScreenTimeManager.shared.checkMindfulBreakExpiry()
+      ScreenTimeManager.shared.evaluateCurrentShieldState()
     }
     #endif
   }
@@ -1531,6 +1710,7 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
                 let isApproved = AuthorizationCenter.shared.authorizationStatus == .approved
                 DispatchQueue.main.async {
                   ScreenTimeManager.shared.startDailyDeviceActivityMonitoring()
+                  ScreenTimeManager.shared.syncScheduleMonitors()
                   ScreenTimeManager.shared.notifyFlutter()
                   result([
                     "authorized": isApproved
@@ -1830,6 +2010,10 @@ class AnchorTimeSavedFactory: NSObject, FlutterPlatformViewFactory {
               }
               return nil
             }()
+            let rawSchedules = args?["schedules"] as? [[String: Any]]
+            if let rawSchedules = rawSchedules {
+              ScreenTimeManager.shared.updateSchedules(from: rawSchedules)
+            }
             ScreenTimeManager.shared.syncShield(shouldBlock: shouldBlock, breakEndTime: breakEndDate)
 
             let sessionRemaining = args?["sessionRemaining"] as? String

@@ -62,8 +62,30 @@ class ScheduleService {
         ? breakEndTime.millisecondsSinceEpoch.toDouble()
         : null;
 
+    final schedulesPayload = rules.map((r) {
+      final startMins =
+          ScheduleRuleModel.parseMinutesFromMidnight(r.startTime) ?? 0;
+      final endMins =
+          ScheduleRuleModel.parseMinutesFromMidnight(r.endTime) ?? 0;
+      return {
+        'id': r.id,
+        'title': r.title,
+        'startHour': startMins ~/ 60,
+        'startMinute': startMins % 60,
+        'endHour': endMins ~/ 60,
+        'endMinute': endMins % 60,
+        'activeDays': r.activeDays.toList(),
+        'isActive': r.isActive,
+      };
+    }).toList();
+
+    final rulesSignature = rules
+        .map((r) =>
+            '${r.id}:${r.isActive}:${r.startTime}:${r.endTime}:${r.activeDays.join(',')}')
+        .join(';');
+
     final signature =
-        '${currentUserId ?? 'anon'}|$hasActiveRunningSchedule|$effectiveIsOnBreak|$breakEndTimeMs|$baselineMinutes|$sessionRemaining|$protectedToday|$screenTimeToday|$scheduleTitle|$projectedTimeText|$projectedLabel|$isSavingTime';
+        '${currentUserId ?? 'anon'}|$hasActiveRunningSchedule|$effectiveIsOnBreak|$breakEndTimeMs|$baselineMinutes|$sessionRemaining|$protectedToday|$screenTimeToday|$scheduleTitle|$projectedTimeText|$projectedLabel|$isSavingTime|$rulesSignature';
     if (_lastNativeShieldSignature == signature) {
       return;
     }
@@ -73,6 +95,7 @@ class ScheduleService {
       await _screenTimeChannel.invokeMethod('syncShield', {
         'shouldBlock': hasActiveRunningSchedule,
         'baselineMinutes': baselineMinutes,
+        'schedules': schedulesPayload,
         if (breakEndTimeMs != null) 'breakEndTimeMs': breakEndTimeMs,
         if (breakDurationMinutes != null)
           'breakDurationMinutes': breakDurationMinutes,
