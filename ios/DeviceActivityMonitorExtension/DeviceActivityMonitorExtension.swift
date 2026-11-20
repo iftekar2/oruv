@@ -91,21 +91,30 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         super.intervalDidStart(for: activity)
         logger.info("[OruvMonitor] intervalDidStart for \(activity.rawValue)")
 
+        // Only handle schedule monitors (ignore oruv.daily.activity report monitor)
+        guard activity.rawValue.starts(with: "oruv.schedule.") else { return }
+
         let sharedDefaults = UserDefaults(suiteName: appGroupId)
         sharedDefaults?.set(Date().timeIntervalSince1970, forKey: "oruv_last_monitor_trigger_time")
         sharedDefaults?.set("intervalDidStart: \(activity.rawValue)", forKey: "oruv_last_monitor_trigger_name")
 
-        // 1. If it's a schedule activity, check if today is an active day
-        if activity.rawValue.starts(with: "oruv.schedule.") {
-            let scheduleId = String(activity.rawValue.dropFirst("oruv.schedule.".count))
-            if let schedulesData = sharedDefaults?.data(forKey: "oruv_stored_schedules"),
-               let schedules = try? JSONDecoder().decode([StoredSchedule].self, from: schedulesData),
-               let schedule = schedules.first(where: { $0.id == scheduleId }) {
-                let weekday = Calendar.current.component(.weekday, from: Date())
-                if !schedule.isScheduled(forWeekday: weekday) {
-                    logger.info("[OruvMonitor] Schedule \(scheduleId) is not active for weekday \(weekday). Skipping.")
-                    return
-                }
+        // If this is a short-schedule (<15 min) end trigger ("oruv.schedule.end.<id>"),
+        // evaluate whether any schedule is still active and clear/apply accordingly.
+        if activity.rawValue.starts(with: "oruv.schedule.end.") {
+            evaluateAndApplyShield(trigger: "shortScheduleEnd: \(activity.rawValue)")
+            return
+        }
+
+        // 1. Check if today is an active day for this schedule
+        let scheduleId = String(activity.rawValue.dropFirst("oruv.schedule.".count))
+        if let schedulesData = sharedDefaults?.data(forKey: "oruv_stored_schedules"),
+           let schedules = try? JSONDecoder().decode([StoredSchedule].self, from: schedulesData),
+           let schedule = schedules.first(where: { $0.id == scheduleId }) {
+            guard schedule.isActive else { return }
+            let weekday = Calendar.current.component(.weekday, from: Date())
+            if !schedule.isScheduled(forWeekday: weekday) {
+                logger.info("[OruvMonitor] Schedule \(scheduleId) is not active for weekday \(weekday). Skipping.")
+                return
             }
         }
 
@@ -129,6 +138,9 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
         logger.info("[OruvMonitor] intervalDidEnd for \(activity.rawValue)")
+
+        // Only handle schedule monitors (ignore oruv.daily.activity report monitor)
+        guard activity.rawValue.starts(with: "oruv.schedule.") else { return }
 
         let sharedDefaults = UserDefaults(suiteName: appGroupId)
         sharedDefaults?.set(Date().timeIntervalSince1970, forKey: "oruv_last_monitor_trigger_time")

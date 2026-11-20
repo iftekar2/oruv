@@ -99,6 +99,7 @@ class ScreenTimeManager: ObservableObject {
   private var isResettingState: Bool = false
   var resolvedTokenNamesCache: [String: String] = [:]
   private(set) var storedSchedules: [StoredSchedule] = []
+  private var lastSyncedSchedulesSignature: String? = nil
 
   private var breakTimer: Timer?
   private var breakBgTaskId: UIBackgroundTaskIdentifier = .invalid
@@ -176,9 +177,12 @@ class ScreenTimeManager: ObservableObject {
   private var isMonitoringStarted: Bool = false
 
   func applyShield(force: Bool = false) {
-    guard force || !isShieldActive || !hasAppliedInitialShieldState else { return }
+    let sharedDefaults = UserDefaults(suiteName: Self.appGroupId)
+    let groupActive = sharedDefaults?.bool(forKey: "oruv_is_shield_active") ?? isShieldActive
+    guard force || !isShieldActive || !groupActive || !hasAppliedInitialShieldState else { return }
     isShieldActive = true
     hasAppliedInitialShieldState = true
+    sharedDefaults?.set(true, forKey: "oruv_is_shield_active")
     store.shield.applications = activitySelection.applicationTokens.isEmpty
       ? nil
       : activitySelection.applicationTokens
@@ -191,9 +195,12 @@ class ScreenTimeManager: ObservableObject {
   }
 
   func clearShield(force: Bool = false) {
-    guard force || isShieldActive || !hasAppliedInitialShieldState else { return }
+    let sharedDefaults = UserDefaults(suiteName: Self.appGroupId)
+    let groupActive = sharedDefaults?.bool(forKey: "oruv_is_shield_active") ?? isShieldActive
+    guard force || isShieldActive || groupActive || !hasAppliedInitialShieldState else { return }
     isShieldActive = false
     hasAppliedInitialShieldState = true
+    sharedDefaults?.set(false, forKey: "oruv_is_shield_active")
     store.shield.applications = nil
     store.shield.applicationCategories = nil
     store.shield.webDomains = nil
@@ -363,7 +370,7 @@ class ScreenTimeManager: ObservableObject {
     syncScheduleMonitors(with: parsed)
   }
 
-  func syncScheduleMonitors(with schedules: [StoredSchedule]? = nil) {
+  func syncScheduleMonitors(with schedules: [StoredSchedule]? = nil, force: Bool = false) {
     #if canImport(DeviceActivity)
     guard AuthorizationCenter.shared.authorizationStatus == .approved else { return }
     let list = schedules ?? storedSchedules
@@ -372,30 +379,81 @@ class ScreenTimeManager: ObservableObject {
     let activeSchedules = list.filter {
       $0.isActive && ($0.startHour != $0.endHour || $0.startMinute != $0.endMinute)
     }
-    let desiredActivityNames = Set(activeSchedules.map { DeviceActivityName("oruv.schedule.\($0.id)") })
 
-    let monitoredActivities = center.activities.filter { $0.rawValue.starts(with: "oruv.schedule.") }
-    for monitored in monitoredActivities {
-      if !desiredActivityNames.contains(monitored) {
-        center.stopMonitoring([monitored])
+    // Build all required DeviceActivityMonitor entries.
+    // Apple's DeviceActivitySchedule requires at least 15 minutes between intervalStart and intervalEnd
+    // (otherwise startMonitoring throws MonitoringError.intervalTooShort).
+    // For schedules shorter than 15 minutes (e.g. quick focus blocks or test schedules),
+    // we pad the start monitor's intervalEnd to +15 minutes and register a second +15 minute
+    // end-trigger monitor ("oruv.schedule.end.<id>") at the actual end time.
+    var desiredMonitors: [(name: DeviceActivityName, schedule: DeviceActivitySchedule, label: String)] = []
+    for s in activeSchedules {
+      let startTotalMins = s.startHour * 60 + s.startMinute
+      let endTotalMins = s.endHour * 60 + s.endMinute
+      let durationMins = endTotalMins > startTotalMins
+        ? (endTotalMins - startTotalMins)
+        : (1440 - startTotalMins + endTotalMins)
+
+      if durationMins >= 15 {
+        let activityName = DeviceActivityName("oruv.schedule.\(s.id)")
+        let schedule = DeviceActivitySchedule(
+          intervalStart: DateComponents(hour: s.startHour, minute: s.startMinute, second: 0),
+          intervalEnd: DateComponents(hour: s.endHour, minute: s.endMinute, second: 0),
+          repeats: true
+        )
+        desiredMonitors.append((name: activityName, schedule: schedule, label: "\(s.id) (\(s.startHour):\(s.startMinute)-\(s.endHour):\(s.endMinute))"))
+      } else {
+        // 1. Start trigger monitor (padded to 15 mins so iOS accepts it and fires intervalDidStart at start time)
+        let paddedStartEndMins = (startTotalMins + 15) % 1440
+        let startActivityName = DeviceActivityName("oruv.schedule.\(s.id)")
+        let startSchedule = DeviceActivitySchedule(
+          intervalStart: DateComponents(hour: s.startHour, minute: s.startMinute, second: 0),
+          intervalEnd: DateComponents(hour: paddedStartEndMins / 60, minute: paddedStartEndMins % 60, second: 0),
+          repeats: true
+        )
+        desiredMonitors.append((name: startActivityName, schedule: startSchedule, label: "\(s.id) [short-start]"))
+
+        // 2. End trigger monitor (starts at actual end time, padded to 15 mins so iOS fires intervalDidStart at end time)
+        let paddedEndEndMins = (endTotalMins + 15) % 1440
+        let endActivityName = DeviceActivityName("oruv.schedule.end.\(s.id)")
+        let endSchedule = DeviceActivitySchedule(
+          intervalStart: DateComponents(hour: s.endHour, minute: s.endMinute, second: 0),
+          intervalEnd: DateComponents(hour: paddedEndEndMins / 60, minute: paddedEndEndMins % 60, second: 0),
+          repeats: true
+        )
+        desiredMonitors.append((name: endActivityName, schedule: endSchedule, label: "\(s.id) [short-end]"))
       }
     }
 
-    for s in activeSchedules {
-      let activityName = DeviceActivityName("oruv.schedule.\(s.id)")
-      let schedule = DeviceActivitySchedule(
-        intervalStart: DateComponents(hour: s.startHour, minute: s.startMinute, second: 0),
-        intervalEnd: DateComponents(hour: s.endHour, minute: s.endMinute, second: 0),
-        repeats: true
-      )
-      // Stop any existing monitor with this name before starting it to prevent alreadyMonitoring error
-      center.stopMonitoring([activityName])
+    let desiredActivityNames = Set(desiredMonitors.map { $0.name })
+    let newSignature = activeSchedules
+      .sorted { $0.id < $1.id }
+      .map { "\($0.id):\($0.isActive):\($0.startHour):\($0.startMinute):\($0.endHour):\($0.endMinute):\($0.activeDays.sorted().joined(separator: ","))" }
+      .joined(separator: "|")
+
+    let currentlyMonitored = Set(center.activities.filter { $0.rawValue.starts(with: "oruv.schedule.") })
+    if !force && newSignature == lastSyncedSchedulesSignature && currentlyMonitored == desiredActivityNames {
+      return
+    }
+
+    // Stop any activities that are no longer desired or are about to be re-registered
+    if !currentlyMonitored.isEmpty {
+      center.stopMonitoring(Array(currentlyMonitored))
+    }
+
+    var allSucceeded = true
+    for item in desiredMonitors {
       do {
-        try center.startMonitoring(activityName, during: schedule)
-        NSLog("[ScreenTimeManager] Successfully registered monitor for %@ (%02d:%02d - %02d:%02d)", s.id, s.startHour, s.startMinute, s.endHour, s.endMinute)
+        try center.startMonitoring(item.name, during: item.schedule)
+        NSLog("[ScreenTimeManager] Registered monitor for %@", item.label)
       } catch {
-        NSLog("[ScreenTimeManager] Failed to monitor schedule %@: %@", s.id, error.localizedDescription)
+        allSucceeded = false
+        NSLog("[ScreenTimeManager] Failed to monitor schedule %@: %@", item.label, error.localizedDescription)
       }
+    }
+
+    if allSucceeded {
+      lastSyncedSchedulesSignature = newSignature
     }
     #endif
   }
@@ -404,14 +462,14 @@ class ScreenTimeManager: ObservableObject {
     checkMindfulBreakExpiry()
     let isBreakActive = mindfulBreakEndTime != nil && Date() < mindfulBreakEndTime!
     if isBreakActive {
-      clearShield()
+      clearShield(force: true)
       return
     }
     let shouldBlock = storedSchedules.contains { $0.isCurrentlyRunning() }
     if shouldBlock {
-      applyShield()
+      applyShield(force: true)
     } else {
-      clearShield()
+      clearShield(force: true)
     }
   }
 
@@ -489,6 +547,7 @@ class ScreenTimeManager: ObservableObject {
     cancelMindfulBreak()
     clearShield(force: true)
     hasAppliedInitialShieldState = false
+    lastSyncedSchedulesSignature = nil
 
     #if canImport(DeviceActivity)
     let center = DeviceActivityCenter()

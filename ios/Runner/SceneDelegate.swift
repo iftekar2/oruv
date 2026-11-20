@@ -52,6 +52,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     #if canImport(FamilyControls)
     if #available(iOS 16.0, *) {
       ScreenTimeManager.shared.checkMindfulBreakExpiry()
+      ScreenTimeManager.shared.evaluateCurrentShieldState()
     }
     #endif
   }
@@ -60,6 +61,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     #if canImport(FamilyControls)
     if #available(iOS 16.0, *) {
       ScreenTimeManager.shared.checkMindfulBreakExpiry()
+      ScreenTimeManager.shared.evaluateCurrentShieldState()
     }
     #endif
   }

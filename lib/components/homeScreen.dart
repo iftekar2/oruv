@@ -432,8 +432,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               OnboardingData.instance.scheduleEnd = end;
               OnboardingData.instance.strictLock = strict;
             });
-            await ScheduleService.upsertSchedule(updated, _rules);
             await _syncShieldAndStats();
+            await ScheduleService.upsertSchedule(updated, _rules);
           }
         },
       ),
@@ -477,10 +477,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }).toList();
     });
 
+    await _syncShieldAndStats();
     if (updatedRule != null) {
       await ScheduleService.upsertSchedule(updatedRule!, _rules);
     }
-    await _syncShieldAndStats();
   }
 
   void _openAddRuleSheet() {
@@ -494,8 +494,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           setState(() {
             _rules = [newRule, ..._rules];
           });
-          await ScheduleService.upsertSchedule(newRule, _rules);
           await _syncShieldAndStats();
+          await ScheduleService.upsertSchedule(newRule, _rules);
           await _refreshDailyScreenTime();
         },
       ),
@@ -524,16 +524,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               OnboardingData.instance.scheduleEnd = updatedRule.endTime;
             }
           });
-          await ScheduleService.upsertSchedule(updatedRule, _rules);
           await _syncShieldAndStats();
+          await ScheduleService.upsertSchedule(updatedRule, _rules);
           await _refreshDailyScreenTime();
         },
         onDelete: () async {
           setState(() {
             _rules = _rules.where((r) => r.id != rule.id).toList();
           });
-          await ScheduleService.deleteSchedule(rule.id, _rules);
           await _syncShieldAndStats();
+          await ScheduleService.deleteSchedule(rule.id, _rules);
         },
       ),
     );
