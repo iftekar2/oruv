@@ -229,8 +229,9 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     }
   }
 
-  static final Uri _supportUri =
-      Uri.parse('https://oruvsupportwebsite.netlify.app/');
+  static final Uri _supportUri = Uri.parse(
+    'https://oruvsupportwebsite.netlify.app/',
+  );
 
   Future<void> _openSupportWebsite() async {
     try {
@@ -239,18 +240,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         mode: LaunchMode.externalApplication,
       );
       if (!launched && mounted) {
-        _showSnackBar(
-          'Could not open support website.',
-          isError: true,
-        );
+        _showSnackBar('Could not open support website.', isError: true);
       }
     } catch (e) {
       debugPrint('Error launching support website: $e');
       if (mounted) {
-        _showSnackBar(
-          'Could not open support website.',
-          isError: true,
-        );
+        _showSnackBar('Could not open support website.', isError: true);
       }
     }
   }
@@ -483,7 +478,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                   SettingsTile(
                     icon: Icons.phonelink_lock_rounded,
                     title: 'Screen Time Access',
-                    subtitle: 'System permission for shielding & usage insights',
+                    subtitle:
+                        'System permission for shielding & usage insights',
                     trailingText: _screenTimeAuthorized ? 'Connected' : 'Off',
                     trailingColor: _screenTimeAuthorized
                         ? SettingsPalette.accentGreen
@@ -504,7 +500,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                   SettingsTile(
                     icon: Icons.support_agent_rounded,
                     title: 'Report an Issue',
-                    subtitle: 'Encountered a bug or need help? Submit an issue to our support team',
+                    subtitle:
+                        'Encountered a bug or need help? Submit an issue to our support team',
                     onTap: _openSupportWebsite,
                     showChevron: true,
                   ),
@@ -555,7 +552,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
               const SizedBox(height: 18),
               Center(
                 child: Text(
-                  'Oruv • Version 1.1.1',
+                  'Oruv • Version 1.1.2',
                   style: GoogleFonts.lora(
                     fontSize: 12,
                     color: SettingsPalette.mutedText.withValues(alpha: 0.75),

@@ -84,12 +84,12 @@ class ScheduleService {
             '${r.id}:${r.isActive}:${r.startTime}:${r.endTime}:${r.activeDays.join(',')}')
         .join(';');
 
+    final isAuthorized = OnboardingData.instance.screenTimeAuthorized;
     final signature =
-        '${currentUserId ?? 'anon'}|$hasActiveRunningSchedule|$effectiveIsOnBreak|$breakEndTimeMs|$baselineMinutes|$sessionRemaining|$protectedToday|$screenTimeToday|$scheduleTitle|$projectedTimeText|$projectedLabel|$isSavingTime|$rulesSignature';
+        '${currentUserId ?? 'anon'}|$isAuthorized|$hasActiveRunningSchedule|$effectiveIsOnBreak|$breakEndTimeMs|$baselineMinutes|$sessionRemaining|$protectedToday|$screenTimeToday|$scheduleTitle|$projectedTimeText|$projectedLabel|$isSavingTime|$rulesSignature';
     if (_lastNativeShieldSignature == signature) {
       return;
     }
-    _lastNativeShieldSignature = signature;
 
     try {
       await _screenTimeChannel.invokeMethod('syncShield', {
@@ -107,6 +107,7 @@ class ScheduleService {
         if (projectedLabel != null) 'projectedLabel': projectedLabel,
         if (isSavingTime != null) 'isSavingTime': isSavingTime,
       });
+      _lastNativeShieldSignature = signature;
     } catch (e) {
       debugPrint('Native syncShield note: $e');
     }

@@ -86,74 +86,89 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     private let store = ManagedSettingsStore()
     private let appGroupId = "group.app.iftekarhossain.oruv"
     private let storageKey = "oruv_family_activity_selection"
+    private let selectionFileName = "family_activity_selection.plist"
+    private let schedulesFileName = "stored_schedules.json"
+    private let mindfulBreakFileName = "mindful_break_state.json"
 
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
-        logger.info("[OruvMonitor] intervalDidStart for \(activity.rawValue)")
-
-        // Only handle schedule monitors (ignore oruv.daily.activity report monitor)
-        guard activity.rawValue.starts(with: "oruv.schedule.") else { return }
+        let rawName = activity.rawValue
+        logger.info("[OruvMonitor] intervalDidStart for \(rawName)")
 
         let sharedDefaults = UserDefaults(suiteName: appGroupId)
         sharedDefaults?.set(Date().timeIntervalSince1970, forKey: "oruv_last_monitor_trigger_time")
-        sharedDefaults?.set("intervalDidStart: \(activity.rawValue)", forKey: "oruv_last_monitor_trigger_name")
+        sharedDefaults?.set("intervalDidStart: \(rawName)", forKey: "oruv_last_monitor_trigger_name")
 
-        // If this is a short-schedule (<15 min) end trigger ("oruv.schedule.end.<id>"),
+        // Handle Mindful Break expiry monitor
+        if rawName == "oruv.mindful_break.end" {
+            clearMindfulBreakState()
+            evaluateAndApplyShield(trigger: "mindfulBreakEnd: \(rawName)")
+            return
+        }
+
+        // Only handle schedule monitors (ignore oruv.daily.activity report monitor)
+        guard rawName.hasPrefix("oruv.schedule.") else { return }
+
+        // If this is a short-schedule (<15 min) end trigger ("oruv.schedule.end.<id>.."),
         // evaluate whether any schedule is still active and clear/apply accordingly.
-        if activity.rawValue.starts(with: "oruv.schedule.end.") {
-            evaluateAndApplyShield(trigger: "shortScheduleEnd: \(activity.rawValue)")
+        if rawName.hasPrefix("oruv.schedule.end.") {
+            evaluateAndApplyShield(trigger: "shortScheduleEnd: \(rawName)")
             return
         }
 
         // 1. Check if today is an active day for this schedule
-        let scheduleId = String(activity.rawValue.dropFirst("oruv.schedule.".count))
-        if let schedulesData = sharedDefaults?.data(forKey: "oruv_stored_schedules"),
-           let schedules = try? JSONDecoder().decode([StoredSchedule].self, from: schedulesData),
-           let schedule = schedules.first(where: { $0.id == scheduleId }) {
+        let scheduleId = extractScheduleId(from: rawName, prefix: "oruv.schedule.")
+        let schedules = loadStoredSchedules()
+        if let schedule = schedules.first(where: { $0.id == scheduleId }) {
             guard schedule.isActive else { return }
-            let weekday = Calendar.current.component(.weekday, from: Date())
-            if !schedule.isScheduled(forWeekday: weekday) {
+            let now = Date()
+            let weekday = Calendar.current.component(.weekday, from: now)
+            if !schedule.isScheduled(forWeekday: weekday) && !schedule.isCurrentlyRunning(at: now) {
                 logger.info("[OruvMonitor] Schedule \(scheduleId) is not active for weekday \(weekday). Skipping.")
                 return
             }
+        } else if !schedules.isEmpty {
+            // Schedule ID no longer exists in stored schedules; evaluate overall state
+            evaluateAndApplyShield(trigger: "unknownScheduleStart: \(rawName)")
+            return
         }
 
         // 2. Check if currently on a mindful break
-        let breakEndTimestamp = sharedDefaults?.double(forKey: "oruv_mindful_break_end_time") ?? 0
-        if breakEndTimestamp > 0 {
-            let breakEndDate = Date(timeIntervalSince1970: breakEndTimestamp)
-            if Date() < breakEndDate {
-                logger.info("[OruvMonitor] Mindful break is active until \(breakEndDate). Skipping shield.")
-                return
-            } else {
-                sharedDefaults?.removeObject(forKey: "oruv_mindful_break_end_time")
-            }
+        if isMindfulBreakActive() {
+            logger.info("[OruvMonitor] Mindful break is currently active. Skipping shield.")
+            return
         }
 
-        // 3. Apply shield immediately!
+        // 3. Apply shield immediately
         applyShield()
         sharedDefaults?.set(true, forKey: "oruv_is_shield_active")
     }
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
-        logger.info("[OruvMonitor] intervalDidEnd for \(activity.rawValue)")
+        let rawName = activity.rawValue
+        logger.info("[OruvMonitor] intervalDidEnd for \(rawName)")
+
+        if rawName == "oruv.mindful_break.end" {
+            evaluateAndApplyShield(trigger: "mindfulBreakIntervalEnd: \(rawName)")
+            return
+        }
 
         // Only handle schedule monitors (ignore oruv.daily.activity report monitor)
-        guard activity.rawValue.starts(with: "oruv.schedule.") else { return }
+        guard rawName.hasPrefix("oruv.schedule.") else { return }
 
         let sharedDefaults = UserDefaults(suiteName: appGroupId)
         sharedDefaults?.set(Date().timeIntervalSince1970, forKey: "oruv_last_monitor_trigger_time")
-        sharedDefaults?.set("intervalDidEnd: \(activity.rawValue)", forKey: "oruv_last_monitor_trigger_name")
+        sharedDefaults?.set("intervalDidEnd: \(rawName)", forKey: "oruv_last_monitor_trigger_name")
 
-        // Check if any other schedule is still active right now
+        // Check if any schedule is still active right now before clearing
         let shouldStayBlocked = shouldShieldBeActive()
         if shouldStayBlocked {
-            logger.info("[OruvMonitor] Another schedule is still active. Keeping shield.")
+            logger.info("[OruvMonitor] A schedule is still active. Keeping shield.")
             applyShield()
             sharedDefaults?.set(true, forKey: "oruv_is_shield_active")
         } else {
-            logger.info("[OruvMonitor] No other schedules running. Clearing shield.")
+            logger.info("[OruvMonitor] No schedules currently running. Clearing shield.")
             clearShield()
             sharedDefaults?.set(false, forKey: "oruv_is_shield_active")
         }
@@ -175,6 +190,100 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         super.eventWillReachThresholdWarning(event, activity: activity)
     }
 
+    private func extractScheduleId(from rawActivityName: String, prefix: String) -> String {
+        let stripped = String(rawActivityName.dropFirst(prefix.count))
+        if let range = stripped.range(of: "..") {
+            return String(stripped[..<range.lowerBound])
+        }
+        return stripped
+    }
+
+    private func readAppGroupData(named fileName: String) -> Data? {
+        guard let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupId
+        ) else {
+            return nil
+        }
+        let fileURL = containerURL.appendingPathComponent(fileName)
+        var resultData: Data? = nil
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        coordinator.coordinate(readingItemAt: fileURL, options: .withoutChanges, error: nil) { targetURL in
+            resultData = try? Data(contentsOf: targetURL)
+        }
+        return resultData
+    }
+
+    private func removeAppGroupFile(named fileName: String) {
+        guard let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupId
+        ) else {
+            return
+        }
+        let fileURL = containerURL.appendingPathComponent(fileName)
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        coordinator.coordinate(writingItemAt: fileURL, options: .forDeleting, error: nil) { targetURL in
+            try? FileManager.default.removeItem(at: targetURL)
+        }
+    }
+
+    private func loadStoredSchedules() -> [StoredSchedule] {
+        if let fileData = readAppGroupData(named: schedulesFileName),
+           let schedules = try? JSONDecoder().decode([StoredSchedule].self, from: fileData) {
+            return schedules
+        }
+        if let schedulesData = UserDefaults(suiteName: appGroupId)?.data(forKey: "oruv_stored_schedules"),
+           let schedules = try? JSONDecoder().decode([StoredSchedule].self, from: schedulesData) {
+            return schedules
+        }
+        return []
+    }
+
+    private func loadActivitySelection() -> FamilyActivitySelection? {
+        if let fileData = readAppGroupData(named: selectionFileName),
+           let selection = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: fileData) {
+            return selection
+        }
+        if let data = UserDefaults(suiteName: appGroupId)?.data(forKey: storageKey),
+           let selection = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: data) {
+            return selection
+        }
+        return nil
+    }
+
+    private func isMindfulBreakActive(at date: Date = Date()) -> Bool {
+        if let data = readAppGroupData(named: mindfulBreakFileName),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let ts = (json["breakEndTime"] as? NSNumber)?.doubleValue ?? (json["breakEndTime"] as? Double),
+           ts > 0 {
+            let breakEndDate = Date(timeIntervalSince1970: ts)
+            if date < breakEndDate {
+                return true
+            } else {
+                clearMindfulBreakState()
+                return false
+            }
+        }
+
+        let sharedDefaults = UserDefaults(suiteName: appGroupId)
+        let breakEndTimestamp = sharedDefaults?.double(forKey: "oruv_mindful_break_end_time") ?? 0
+        if breakEndTimestamp > 0 {
+            let breakEndDate = Date(timeIntervalSince1970: breakEndTimestamp)
+            if date < breakEndDate {
+                return true
+            } else {
+                clearMindfulBreakState()
+                return false
+            }
+        }
+        return false
+    }
+
+    private func clearMindfulBreakState() {
+        let sharedDefaults = UserDefaults(suiteName: appGroupId)
+        sharedDefaults?.removeObject(forKey: "oruv_mindful_break_end_time")
+        removeAppGroupFile(named: mindfulBreakFileName)
+    }
+
     private func evaluateAndApplyShield(trigger: String) {
         let sharedDefaults = UserDefaults(suiteName: appGroupId)
         sharedDefaults?.set(Date().timeIntervalSince1970, forKey: "oruv_last_monitor_trigger_time")
@@ -193,22 +302,14 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     }
 
     private func shouldShieldBeActive(at date: Date = Date()) -> Bool {
-        let sharedDefaults = UserDefaults(suiteName: appGroupId)
-
         // 1. Check if currently on a mindful break
-        let breakEndTimestamp = sharedDefaults?.double(forKey: "oruv_mindful_break_end_time") ?? 0
-        if breakEndTimestamp > 0 {
-            let breakEndDate = Date(timeIntervalSince1970: breakEndTimestamp)
-            if date < breakEndDate {
-                return false
-            } else {
-                sharedDefaults?.removeObject(forKey: "oruv_mindful_break_end_time")
-            }
+        if isMindfulBreakActive(at: date) {
+            return false
         }
 
-        // 2. Read stored schedules
-        guard let schedulesData = sharedDefaults?.data(forKey: "oruv_stored_schedules"),
-              let schedules = try? JSONDecoder().decode([StoredSchedule].self, from: schedulesData) else {
+        // 2. Read stored schedules from App Group file (with UserDefaults fallback)
+        let schedules = loadStoredSchedules()
+        guard !schedules.isEmpty else {
             return false
         }
 
@@ -217,8 +318,7 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     }
 
     private func applyShield() {
-        guard let data = UserDefaults(suiteName: appGroupId)?.data(forKey: storageKey),
-              let selection = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: data) else {
+        guard let selection = loadActivitySelection() else {
             logger.warning("[OruvMonitor] No saved selection found in App Group")
             return
         }

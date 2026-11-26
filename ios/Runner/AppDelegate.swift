@@ -91,6 +91,10 @@ class ScreenTimeManager: ObservableObject {
   static let shared = ScreenTimeManager()
   static let appGroupId = "group.app.iftekarhossain.oruv"
   private let storageKey = "oruv_family_activity_selection"
+  private static let selectionFileName = "family_activity_selection.plist"
+  private static let schedulesFileName = "stored_schedules.json"
+  private static let mindfulBreakFileName = "mindful_break_state.json"
+  private static let syncedSignatureKey = "oruv_last_synced_schedules_signature"
   private let store = ManagedSettingsStore()
 
   var methodChannel: FlutterMethodChannel?
@@ -128,21 +132,77 @@ class ScreenTimeManager: ObservableObject {
   }
 
   private init() {
-    if let data = UserDefaults.standard.data(forKey: storageKey),
-       let decoded = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: data) {
+    let sharedDefaults = UserDefaults(suiteName: Self.appGroupId)
+    self.lastSyncedSchedulesSignature = sharedDefaults?.string(forKey: Self.syncedSignatureKey)
+
+    if let fileData = Self.readAppGroupData(named: Self.selectionFileName),
+       let decoded = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: fileData) {
       self.activitySelection = decoded
       refreshOrderedTokens()
       saveSelection()
-    } else if let groupData = UserDefaults(suiteName: Self.appGroupId)?.data(forKey: storageKey),
+    } else if let data = UserDefaults.standard.data(forKey: storageKey),
+              let decoded = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: data) {
+      self.activitySelection = decoded
+      refreshOrderedTokens()
+      saveSelection()
+    } else if let groupData = sharedDefaults?.data(forKey: storageKey),
               let decoded = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: groupData) {
       self.activitySelection = decoded
       refreshOrderedTokens()
       saveSelection()
     }
-    if let schedulesData = UserDefaults(suiteName: Self.appGroupId)?.data(forKey: "oruv_stored_schedules"),
-       let decoded = try? JSONDecoder().decode([StoredSchedule].self, from: schedulesData) {
+
+    if let fileData = Self.readAppGroupData(named: Self.schedulesFileName),
+       let decoded = try? JSONDecoder().decode([StoredSchedule].self, from: fileData) {
       self.storedSchedules = decoded
       syncScheduleMonitors(with: decoded)
+    } else if let schedulesData = sharedDefaults?.data(forKey: "oruv_stored_schedules"),
+              let decoded = try? JSONDecoder().decode([StoredSchedule].self, from: schedulesData) {
+      self.storedSchedules = decoded
+      persistSchedulesToAppGroup(decoded)
+      syncScheduleMonitors(with: decoded)
+    }
+  }
+
+  private static func readAppGroupData(named fileName: String) -> Data? {
+    guard let containerURL = FileManager.default.containerURL(
+      forSecurityApplicationGroupIdentifier: appGroupId
+    ) else {
+      return nil
+    }
+    let fileURL = containerURL.appendingPathComponent(fileName)
+    var resultData: Data? = nil
+    let coordinator = NSFileCoordinator(filePresenter: nil)
+    coordinator.coordinate(readingItemAt: fileURL, options: .withoutChanges, error: nil) { targetURL in
+      resultData = try? Data(contentsOf: targetURL)
+    }
+    return resultData
+  }
+
+  private static func removeAppGroupFile(named fileName: String) {
+    guard let containerURL = FileManager.default.containerURL(
+      forSecurityApplicationGroupIdentifier: appGroupId
+    ) else {
+      return
+    }
+    let fileURL = containerURL.appendingPathComponent(fileName)
+    let coordinator = NSFileCoordinator(filePresenter: nil)
+    coordinator.coordinate(writingItemAt: fileURL, options: .forDeleting, error: nil) { targetURL in
+      try? FileManager.default.removeItem(at: targetURL)
+    }
+  }
+
+  private func persistSchedulesToAppGroup(_ schedules: [StoredSchedule]) {
+    if let encoded = try? JSONEncoder().encode(schedules) {
+      let sharedDefaults = UserDefaults(suiteName: Self.appGroupId)
+      sharedDefaults?.set(encoded, forKey: "oruv_stored_schedules")
+      sharedDefaults?.synchronize()
+      if let containerURL = FileManager.default.containerURL(
+        forSecurityApplicationGroupIdentifier: Self.appGroupId
+      ) {
+        let fileURL = containerURL.appendingPathComponent(Self.schedulesFileName)
+        Self.writeProtectedAppGroupData(encoded, to: fileURL)
+      }
     }
   }
 
@@ -154,7 +214,15 @@ class ScreenTimeManager: ObservableObject {
   func saveSelection() {
     if let encoded = try? PropertyListEncoder().encode(activitySelection) {
       UserDefaults.standard.set(encoded, forKey: storageKey)
-      UserDefaults(suiteName: Self.appGroupId)?.set(encoded, forKey: storageKey)
+      let sharedDefaults = UserDefaults(suiteName: Self.appGroupId)
+      sharedDefaults?.set(encoded, forKey: storageKey)
+      sharedDefaults?.synchronize()
+      if let containerURL = FileManager.default.containerURL(
+        forSecurityApplicationGroupIdentifier: Self.appGroupId
+      ) {
+        let fileURL = containerURL.appendingPathComponent(Self.selectionFileName)
+        Self.writeProtectedAppGroupData(encoded, to: fileURL)
+      }
     }
   }
 
@@ -176,10 +244,16 @@ class ScreenTimeManager: ObservableObject {
 
   private var isMonitoringStarted: Bool = false
 
+  private var storeHasActiveShield: Bool {
+    return store.shield.applications != nil ||
+           store.shield.applicationCategories != nil ||
+           store.shield.webDomains != nil
+  }
+
   func applyShield(force: Bool = false) {
     let sharedDefaults = UserDefaults(suiteName: Self.appGroupId)
     let groupActive = sharedDefaults?.bool(forKey: "oruv_is_shield_active") ?? isShieldActive
-    guard force || !isShieldActive || !groupActive || !hasAppliedInitialShieldState else { return }
+    guard force || !isShieldActive || !groupActive || !storeHasActiveShield || !hasAppliedInitialShieldState else { return }
     isShieldActive = true
     hasAppliedInitialShieldState = true
     sharedDefaults?.set(true, forKey: "oruv_is_shield_active")
@@ -197,7 +271,7 @@ class ScreenTimeManager: ObservableObject {
   func clearShield(force: Bool = false) {
     let sharedDefaults = UserDefaults(suiteName: Self.appGroupId)
     let groupActive = sharedDefaults?.bool(forKey: "oruv_is_shield_active") ?? isShieldActive
-    guard force || isShieldActive || groupActive || !hasAppliedInitialShieldState else { return }
+    guard force || isShieldActive || groupActive || storeHasActiveShield || !hasAppliedInitialShieldState else { return }
     isShieldActive = false
     hasAppliedInitialShieldState = true
     sharedDefaults?.set(false, forKey: "oruv_is_shield_active")
@@ -226,20 +300,54 @@ class ScreenTimeManager: ObservableObject {
     }
   }
 
+  private func persistMindfulBreakEndTime(_ targetDate: Date?) {
+    let sharedDefaults = UserDefaults(suiteName: Self.appGroupId)
+    if let targetDate = targetDate {
+      let ts = targetDate.timeIntervalSince1970
+      sharedDefaults?.set(ts, forKey: "oruv_mindful_break_end_time")
+      sharedDefaults?.synchronize()
+      if let containerURL = FileManager.default.containerURL(
+        forSecurityApplicationGroupIdentifier: Self.appGroupId
+      ),
+         let data = try? JSONSerialization.data(withJSONObject: ["breakEndTime": ts], options: []) {
+        let fileURL = containerURL.appendingPathComponent(Self.mindfulBreakFileName)
+        Self.writeProtectedAppGroupData(data, to: fileURL)
+      }
+    } else {
+      sharedDefaults?.removeObject(forKey: "oruv_mindful_break_end_time")
+      sharedDefaults?.synchronize()
+      Self.removeAppGroupFile(named: Self.mindfulBreakFileName)
+    }
+  }
+
+  private func readPersistedMindfulBreakEndTime() -> Date? {
+    if let data = Self.readAppGroupData(named: Self.mindfulBreakFileName),
+       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let ts = (json["breakEndTime"] as? NSNumber)?.doubleValue ?? (json["breakEndTime"] as? Double),
+       ts > 0 {
+      return Date(timeIntervalSince1970: ts)
+    }
+    let ts = UserDefaults(suiteName: Self.appGroupId)?.double(forKey: "oruv_mindful_break_end_time") ?? 0
+    if ts > 0 {
+      return Date(timeIntervalSince1970: ts)
+    }
+    return nil
+  }
+
   func scheduleMindfulBreak(until targetDate: Date) {
     cancelMindfulBreakTimerOnly()
     mindfulBreakEndTime = targetDate
-    UserDefaults(suiteName: Self.appGroupId)?.set(
-      targetDate.timeIntervalSince1970,
-      forKey: "oruv_mindful_break_end_time"
-    )
+    persistMindfulBreakEndTime(targetDate)
 
     if Date() >= targetDate {
       applyShield(force: true)
       mindfulBreakEndTime = nil
-      UserDefaults(suiteName: Self.appGroupId)?.removeObject(forKey: "oruv_mindful_break_end_time")
+      persistMindfulBreakEndTime(nil)
+      stopMindfulBreakDeviceActivityMonitor()
       return
     }
+
+    registerMindfulBreakDeviceActivityMonitor(at: targetDate)
 
     let interval = max(1.0, targetDate.timeIntervalSinceNow)
     breakTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
@@ -263,10 +371,46 @@ class ScreenTimeManager: ObservableObject {
     scheduleBreakEndNotification(at: targetDate)
   }
 
+  private func registerMindfulBreakDeviceActivityMonitor(at targetDate: Date) {
+    #if canImport(DeviceActivity)
+    guard AuthorizationCenter.shared.authorizationStatus == .approved else { return }
+    let center = DeviceActivityCenter()
+    let activityName = DeviceActivityName("oruv.mindful_break.end")
+
+    let calendar = Calendar.current
+    let startHour = calendar.component(.hour, from: targetDate)
+    let startMinute = calendar.component(.minute, from: targetDate)
+    let startTotalMins = startHour * 60 + startMinute
+    let paddedEndMins = (startTotalMins + 15) % 1440
+
+    let schedule = DeviceActivitySchedule(
+      intervalStart: DateComponents(hour: startHour, minute: startMinute),
+      intervalEnd: DateComponents(hour: paddedEndMins / 60, minute: paddedEndMins % 60),
+      repeats: false
+    )
+    do {
+      try center.startMonitoring(activityName, during: schedule)
+    } catch {
+      NSLog("[ScreenTimeManager] Failed to register mindful break end monitor: %@", error.localizedDescription)
+    }
+    #endif
+  }
+
+  private func stopMindfulBreakDeviceActivityMonitor() {
+    #if canImport(DeviceActivity)
+    let center = DeviceActivityCenter()
+    let activityName = DeviceActivityName("oruv.mindful_break.end")
+    if center.activities.contains(activityName) {
+      center.stopMonitoring([activityName])
+    }
+    #endif
+  }
+
   func cancelMindfulBreak() {
     cancelMindfulBreakTimerOnly()
     mindfulBreakEndTime = nil
-    UserDefaults(suiteName: Self.appGroupId)?.removeObject(forKey: "oruv_mindful_break_end_time")
+    persistMindfulBreakEndTime(nil)
+    stopMindfulBreakDeviceActivityMonitor()
     UNUserNotificationCenter.current().removePendingNotificationRequests(
       withIdentifiers: ["oruv.mindful_break_ended"]
     )
@@ -282,14 +426,13 @@ class ScreenTimeManager: ObservableObject {
   }
 
   func checkMindfulBreakExpiry() {
-    let sharedDefaults = UserDefaults(suiteName: Self.appGroupId)
-    let storedTimestamp = sharedDefaults?.double(forKey: "oruv_mindful_break_end_time") ?? 0
-    if storedTimestamp > 0 {
-      let targetDate = Date(timeIntervalSince1970: storedTimestamp)
+    if let targetDate = readPersistedMindfulBreakEndTime() {
       if Date() >= targetDate {
-        sharedDefaults?.removeObject(forKey: "oruv_mindful_break_end_time")
+        persistMindfulBreakEndTime(nil)
         applyShield(force: true)
         cancelMindfulBreak()
+      } else {
+        mindfulBreakEndTime = targetDate
       }
     }
   }
@@ -324,9 +467,13 @@ class ScreenTimeManager: ObservableObject {
     guard AuthorizationCenter.shared.authorizationStatus == .approved else { return }
     let center = DeviceActivityCenter()
     let activityName = DeviceActivityName("oruv.daily.activity")
+    if center.activities.contains(activityName) {
+      isMonitoringStarted = true
+      return
+    }
     let schedule = DeviceActivitySchedule(
-      intervalStart: DateComponents(hour: 0, minute: 0, second: 0),
-      intervalEnd: DateComponents(hour: 23, minute: 59, second: 59),
+      intervalStart: DateComponents(hour: 0, minute: 0),
+      intervalEnd: DateComponents(hour: 23, minute: 59),
       repeats: true
     )
     do {
@@ -364,9 +511,7 @@ class ScreenTimeManager: ObservableObject {
       ))
     }
     self.storedSchedules = parsed
-    if let encoded = try? JSONEncoder().encode(parsed) {
-      UserDefaults(suiteName: Self.appGroupId)?.set(encoded, forKey: "oruv_stored_schedules")
-    }
+    persistSchedulesToAppGroup(parsed)
     syncScheduleMonitors(with: parsed)
   }
 
@@ -381,11 +526,9 @@ class ScreenTimeManager: ObservableObject {
     }
 
     // Build all required DeviceActivityMonitor entries.
-    // Apple's DeviceActivitySchedule requires at least 15 minutes between intervalStart and intervalEnd
-    // (otherwise startMonitoring throws MonitoringError.intervalTooShort).
-    // For schedules shorter than 15 minutes (e.g. quick focus blocks or test schedules),
-    // we pad the start monitor's intervalEnd to +15 minutes and register a second +15 minute
-    // end-trigger monitor ("oruv.schedule.end.<id>") at the actual end time.
+    // Encode the schedule's start/end time window into the DeviceActivityName ("..<startH>_<startM>_<endH>_<endM>")
+    // so that when a user edits a schedule's time, the old monitor name and new monitor name are distinct
+    // and never collide during stopMonitoring + startMonitoring in deviceactivityd.
     var desiredMonitors: [(name: DeviceActivityName, schedule: DeviceActivitySchedule, label: String)] = []
     for s in activeSchedules {
       let startTotalMins = s.startHour * 60 + s.startMinute
@@ -393,32 +536,33 @@ class ScreenTimeManager: ObservableObject {
       let durationMins = endTotalMins > startTotalMins
         ? (endTotalMins - startTotalMins)
         : (1440 - startTotalMins + endTotalMins)
+      let timeSuffix = "\(s.startHour)_\(s.startMinute)_\(s.endHour)_\(s.endMinute)"
 
       if durationMins >= 15 {
-        let activityName = DeviceActivityName("oruv.schedule.\(s.id)")
+        let activityName = DeviceActivityName("oruv.schedule.\(s.id)..\(timeSuffix)")
         let schedule = DeviceActivitySchedule(
-          intervalStart: DateComponents(hour: s.startHour, minute: s.startMinute, second: 0),
-          intervalEnd: DateComponents(hour: s.endHour, minute: s.endMinute, second: 0),
+          intervalStart: DateComponents(hour: s.startHour, minute: s.startMinute),
+          intervalEnd: DateComponents(hour: s.endHour, minute: s.endMinute),
           repeats: true
         )
         desiredMonitors.append((name: activityName, schedule: schedule, label: "\(s.id) (\(s.startHour):\(s.startMinute)-\(s.endHour):\(s.endMinute))"))
       } else {
         // 1. Start trigger monitor (padded to 15 mins so iOS accepts it and fires intervalDidStart at start time)
         let paddedStartEndMins = (startTotalMins + 15) % 1440
-        let startActivityName = DeviceActivityName("oruv.schedule.\(s.id)")
+        let startActivityName = DeviceActivityName("oruv.schedule.\(s.id)..\(timeSuffix)")
         let startSchedule = DeviceActivitySchedule(
-          intervalStart: DateComponents(hour: s.startHour, minute: s.startMinute, second: 0),
-          intervalEnd: DateComponents(hour: paddedStartEndMins / 60, minute: paddedStartEndMins % 60, second: 0),
+          intervalStart: DateComponents(hour: s.startHour, minute: s.startMinute),
+          intervalEnd: DateComponents(hour: paddedStartEndMins / 60, minute: paddedStartEndMins % 60),
           repeats: true
         )
         desiredMonitors.append((name: startActivityName, schedule: startSchedule, label: "\(s.id) [short-start]"))
 
         // 2. End trigger monitor (starts at actual end time, padded to 15 mins so iOS fires intervalDidStart at end time)
         let paddedEndEndMins = (endTotalMins + 15) % 1440
-        let endActivityName = DeviceActivityName("oruv.schedule.end.\(s.id)")
+        let endActivityName = DeviceActivityName("oruv.schedule.end.\(s.id)..\(timeSuffix)")
         let endSchedule = DeviceActivitySchedule(
-          intervalStart: DateComponents(hour: s.endHour, minute: s.endMinute, second: 0),
-          intervalEnd: DateComponents(hour: paddedEndEndMins / 60, minute: paddedEndEndMins % 60, second: 0),
+          intervalStart: DateComponents(hour: s.endHour, minute: s.endMinute),
+          intervalEnd: DateComponents(hour: paddedEndEndMins / 60, minute: paddedEndEndMins % 60),
           repeats: true
         )
         desiredMonitors.append((name: endActivityName, schedule: endSchedule, label: "\(s.id) [short-end]"))
@@ -431,18 +575,27 @@ class ScreenTimeManager: ObservableObject {
       .map { "\($0.id):\($0.isActive):\($0.startHour):\($0.startMinute):\($0.endHour):\($0.endMinute):\($0.activeDays.sorted().joined(separator: ","))" }
       .joined(separator: "|")
 
-    let currentlyMonitored = Set(center.activities.filter { $0.rawValue.starts(with: "oruv.schedule.") })
-    if !force && newSignature == lastSyncedSchedulesSignature && currentlyMonitored == desiredActivityNames {
+    let currentlyMonitored = Set(center.activities.filter { $0.rawValue.hasPrefix("oruv.schedule.") })
+    if !force && currentlyMonitored == desiredActivityNames {
+      if lastSyncedSchedulesSignature != newSignature {
+        lastSyncedSchedulesSignature = newSignature
+        UserDefaults(suiteName: Self.appGroupId)?.set(newSignature, forKey: Self.syncedSignatureKey)
+      }
       return
     }
 
-    // Stop any activities that are no longer desired or are about to be re-registered
-    if !currentlyMonitored.isEmpty {
-      center.stopMonitoring(Array(currentlyMonitored))
+    // Diff-based update: only stop removed/outdated monitors and only start new/changed monitors
+    let monitorsToStop = force ? currentlyMonitored : currentlyMonitored.subtracting(desiredActivityNames)
+    if !monitorsToStop.isEmpty {
+      center.stopMonitoring(Array(monitorsToStop))
     }
 
+    let monitorsToStart = force
+      ? desiredMonitors
+      : desiredMonitors.filter { !currentlyMonitored.contains($0.name) }
+
     var allSucceeded = true
-    for item in desiredMonitors {
+    for item in monitorsToStart {
       do {
         try center.startMonitoring(item.name, during: item.schedule)
         NSLog("[ScreenTimeManager] Registered monitor for %@", item.label)
@@ -454,6 +607,7 @@ class ScreenTimeManager: ObservableObject {
 
     if allSucceeded {
       lastSyncedSchedulesSignature = newSignature
+      UserDefaults(suiteName: Self.appGroupId)?.set(newSignature, forKey: Self.syncedSignatureKey)
     }
     #endif
   }
@@ -465,6 +619,13 @@ class ScreenTimeManager: ObservableObject {
       clearShield(force: true)
       return
     }
+    if storedSchedules.isEmpty {
+      if let fileData = Self.readAppGroupData(named: Self.schedulesFileName),
+         let decoded = try? JSONDecoder().decode([StoredSchedule].self, from: fileData) {
+        storedSchedules = decoded
+      }
+    }
+    syncScheduleMonitors()
     let shouldBlock = storedSchedules.contains { $0.isCurrentlyRunning() }
     if shouldBlock {
       applyShield(force: true)
@@ -548,10 +709,13 @@ class ScreenTimeManager: ObservableObject {
     clearShield(force: true)
     hasAppliedInitialShieldState = false
     lastSyncedSchedulesSignature = nil
+    UserDefaults(suiteName: Self.appGroupId)?.removeObject(forKey: Self.syncedSignatureKey)
 
     #if canImport(DeviceActivity)
     let center = DeviceActivityCenter()
-    let scheduleActivities = center.activities.filter { $0.rawValue.starts(with: "oruv.schedule.") }
+    let scheduleActivities = center.activities.filter {
+      $0.rawValue.hasPrefix("oruv.schedule.") || $0.rawValue == "oruv.mindful_break.end"
+    }
     if !scheduleActivities.isEmpty {
       center.stopMonitoring(scheduleActivities)
     }
@@ -568,6 +732,9 @@ class ScreenTimeManager: ObservableObject {
     if clearSelection {
       storedSchedules.removeAll()
       UserDefaults(suiteName: Self.appGroupId)?.removeObject(forKey: "oruv_stored_schedules")
+      Self.removeAppGroupFile(named: Self.schedulesFileName)
+      Self.removeAppGroupFile(named: Self.selectionFileName)
+      Self.removeAppGroupFile(named: Self.mindfulBreakFileName)
       isResettingState = true
       activitySelection = FamilyActivitySelection()
       isResettingState = false
