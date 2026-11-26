@@ -555,7 +555,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
               const SizedBox(height: 18),
               Center(
                 child: Text(
-                  'Oruv • Version 1.1.0',
+                  'Oruv • Version 1.1.1',
                   style: GoogleFonts.lora(
                     fontSize: 12,
                     color: SettingsPalette.mutedText.withValues(alpha: 0.75),
